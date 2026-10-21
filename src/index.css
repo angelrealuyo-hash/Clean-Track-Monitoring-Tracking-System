@@ -1,5 +1,6 @@
 @import './styles/theme.css';
 @import './styles/forms.css';
+@import './styles/ui.css';
 
 *,
 *::before,

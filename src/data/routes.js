@@ -1,8 +1,22 @@
 // One collection route covering Purok 1-6, in stop order.
-// Coordinates are fictional and only used to draw the simulated map.
+//
+// DEMO ROUTE: the coordinates below are illustrative. They are NOT verified
+// locations in Barangay San Antonio, and the lines between stops are straight
+// lines, not real streets. The map shows a "Demo route" warning while
+// coordinatesVerified is false.
+//
+// To use your real barangay:
+//   1. For each stop, find the spot on https://www.openstreetmap.org, right-click,
+//      choose "Show address", and copy the latitude, longitude shown.
+//      (Or record it on site with a phone GPS app.)
+//   2. Put the values in `coords: [latitude, longitude]` below, in driving order.
+//   3. Update `center` in barangay.js to the middle of the barangay.
+//   4. Set coordinatesVerified to true once the barangay office confirms them.
 export const route = {
   id: 'RT-01',
   name: 'Barangay San Antonio Collection Route',
+  shortName: 'Purok 1-6 Loop',
+  coordinatesVerified: false,
   truckId: 'TRK-01',
   driverId: 'DRV-01',
   startTime: '06:00 AM',

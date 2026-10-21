@@ -1,0 +1,106 @@
+.ct-map {
+  position: relative;
+  overflow: hidden;
+  background: #e6efe9;
+  border-radius: var(--ct-radius);
+}
+
+.ct-map__leaflet {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  background: #e6efe9;
+  font-family: var(--ct-font);
+}
+
+.ct-map__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--ct-green-900);
+  background: rgba(236, 250, 241, 0.75);
+  pointer-events: none;
+}
+
+.ct-map__banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 500;
+  width: min(90%, 460px);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ct-red-600);
+  background: var(--ct-red-100);
+  border: 1px solid #f6c2be;
+  border-radius: var(--ct-radius-sm);
+  transform: translateX(-50%);
+}
+
+/* Truck marker */
+.ct-truck-marker {
+  /* Glide smoothly between simulated GPS updates (1 per second). */
+  transition: transform 0.95s linear;
+}
+
+.is-moving .ct-truck-marker,
+.leaflet-zoom-anim .ct-truck-marker {
+  transition: none;
+}
+
+.ct-truck-marker__pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: #fff;
+  background: var(--ct-green-900);
+  border: 3px solid #fff;
+  border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(6, 78, 50, 0.4);
+}
+
+.ct-truck-marker--paused .ct-truck-marker__pin {
+  background: var(--ct-amber-500);
+}
+
+.ct-truck-marker--stopped .ct-truck-marker__pin {
+  background: var(--ct-red-600);
+}
+
+.ct-truck-marker--idle .ct-truck-marker__pin,
+.ct-truck-marker--completed .ct-truck-marker__pin {
+  background: #6b7c72;
+}
+
+/* Legend */
+.ct-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.ct-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ct-map-legend i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.ct-map-legend .is-truck { border-radius: 3px; background: var(--ct-green-900); }
+.ct-map-legend .is-collected { background: var(--ct-green-900); }
+.ct-map-legend .is-next { background: var(--ct-amber-500); }
+.ct-map-legend .is-pending { background: #fff; border: 2px solid var(--ct-green-700); }
+.ct-map-legend .is-depot { background: var(--ct-blue-600); }
