@@ -1,122 +1,56 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+// TEMPORARY preview for Phase 4: shows that every page and the simulated GPS
+// service load. Phase 5 replaces this with React Router and the real layouts.
+import { useEffect, useState } from 'react'
+import * as adminPages from './admin/pages/index.js'
+import * as residentPages from './resident/pages/index.js'
+import * as driverPages from './driver/pages/index.js'
+import { startGpsSimulation, SIMULATION_LABEL } from './services/simulatedGps.js'
+import StatusBadge from './components/StatusBadge.jsx'
+import { barangay } from './data/barangay.js'
+import { truck } from './data/truck.js'
 
-function App() {
-  const [count, setCount] = useState(0)
+const apps = [
+  ['Admin Website', adminPages],
+  ['Resident App', residentPages],
+  ['Driver App', driverPages],
+]
+
+export default function App() {
+  const [selected, setSelected] = useState(['Admin Website', 'DashboardPage'])
+  const [gps, setGps] = useState(null)
+
+  useEffect(() => startGpsSimulation(setGps), [])
+
+  const SelectedPage = apps.find(([name]) => name === selected[0])[1][selected[1]]
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <div style={{ padding: 24 }}>
+      <h1 style={{ color: 'var(--ct-green-900)' }}>CleanTrack: structure preview</h1>
+      <p>
+        {barangay.name} · {truck.id} ({truck.type}){' '}
+        <StatusBadge tone="green">{truck.status}</StatusBadge>
+      </p>
+      {gps && (
+        <p>
+          <StatusBadge tone="amber">{SIMULATION_LABEL}</StatusBadge>{' '}
+          {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)} · {gps.speedKmh} km/h · next stop: {gps.nextStop.name}
+        </p>
+      )}
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        {apps.map(([appName, pages]) => (
+          <div key={appName}>
+            <h3>{appName}</h3>
+            {Object.keys(pages).map((page) => (
+              <div key={page}>
+                <button type="button" onClick={() => setSelected([appName, page])}>
+                  {page}
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <SelectedPage />
+    </div>
   )
 }
-
-export default App
