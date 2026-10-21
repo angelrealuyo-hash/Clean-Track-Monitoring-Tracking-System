@@ -1,56 +1,83 @@
-// TEMPORARY preview for Phase 4: shows that every page and the simulated GPS
-// service load. Phase 5 replaces this with React Router and the real layouts.
-import { useEffect, useState } from 'react'
-import * as adminPages from './admin/pages/index.js'
-import * as residentPages from './resident/pages/index.js'
-import * as driverPages from './driver/pages/index.js'
-import { startGpsSimulation, SIMULATION_LABEL } from './services/simulatedGps.js'
-import StatusBadge from './components/StatusBadge.jsx'
-import { barangay } from './data/barangay.js'
-import { truck } from './data/truck.js'
+import { Route, Routes } from 'react-router-dom'
+import RequireRole from './auth/RequireRole.jsx'
+import PortalChooser from './pages/PortalChooser.jsx'
+import NotFoundPage from './pages/NotFoundPage.jsx'
 
-const apps = [
-  ['Admin Website', adminPages],
-  ['Resident App', residentPages],
-  ['Driver App', driverPages],
-]
+import AdminLayout from './admin/components/AdminLayout.jsx'
+import ResidentLayout from './resident/components/ResidentLayout.jsx'
+import DriverLayout from './driver/components/DriverLayout.jsx'
+import * as Admin from './admin/pages/index.js'
+import * as Resident from './resident/pages/index.js'
+import * as Driver from './driver/pages/index.js'
 
+// All pages in CleanTrack. Each app has its own login and is protected
+// by RequireRole, so you must sign in to that app to see its pages.
 export default function App() {
-  const [selected, setSelected] = useState(['Admin Website', 'DashboardPage'])
-  const [gps, setGps] = useState(null)
-
-  useEffect(() => startGpsSimulation(setGps), [])
-
-  const SelectedPage = apps.find(([name]) => name === selected[0])[1][selected[1]]
-
   return (
-    <div style={{ padding: 24 }}>
-      <h1 style={{ color: 'var(--ct-green-900)' }}>CleanTrack: structure preview</h1>
-      <p>
-        {barangay.name} · {truck.id} ({truck.type}){' '}
-        <StatusBadge tone="green">{truck.status}</StatusBadge>
-      </p>
-      {gps && (
-        <p>
-          <StatusBadge tone="amber">{SIMULATION_LABEL}</StatusBadge>{' '}
-          {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)} · {gps.speedKmh} km/h · next stop: {gps.nextStop.name}
-        </p>
-      )}
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        {apps.map(([appName, pages]) => (
-          <div key={appName}>
-            <h3>{appName}</h3>
-            {Object.keys(pages).map((page) => (
-              <div key={page}>
-                <button type="button" onClick={() => setSelected([appName, page])}>
-                  {page}
-                </button>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-      <SelectedPage />
-    </div>
+    <Routes>
+      <Route path="/" element={<PortalChooser />} />
+
+      {/* Admin Website */}
+      <Route path="/admin/login" element={<Admin.LoginPage />} />
+      <Route
+        path="/admin"
+        element={
+          <RequireRole role="admin">
+            <AdminLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<Admin.DashboardPage />} />
+        <Route path="live-tracking" element={<Admin.LiveTrackingPage />} />
+        <Route path="truck" element={<Admin.TruckPage />} />
+        <Route path="drivers" element={<Admin.DriverManagementPage />} />
+        <Route path="routes" element={<Admin.RoutesSchedulesPage />} />
+        <Route path="collection" element={<Admin.CollectionMonitoringPage />} />
+        <Route path="resident-reports" element={<Admin.ResidentReportsPage />} />
+        <Route path="notifications" element={<Admin.NotificationsPage />} />
+        <Route path="analytics" element={<Admin.ReportsAnalyticsPage />} />
+        <Route path="settings" element={<Admin.SettingsPage />} />
+      </Route>
+
+      {/* Resident App */}
+      <Route path="/resident/login" element={<Resident.LoginPage />} />
+      <Route path="/resident/register" element={<Resident.CreateAccountPage />} />
+      <Route
+        path="/resident"
+        element={
+          <RequireRole role="resident">
+            <ResidentLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<Resident.HomePage />} />
+        <Route path="track" element={<Resident.TrackTruckPage />} />
+        <Route path="schedule" element={<Resident.SchedulePage />} />
+        <Route path="reports" element={<Resident.MyReportsPage />} />
+        <Route path="reports/new" element={<Resident.ReportProblemPage />} />
+        <Route path="reports/:reportId" element={<Resident.ReportDetailPage />} />
+        <Route path="notifications" element={<Resident.NotificationsPage />} />
+        <Route path="profile" element={<Resident.ProfilePage />} />
+      </Route>
+
+      {/* Driver App */}
+      <Route path="/driver/login" element={<Driver.LoginPage />} />
+      <Route
+        path="/driver"
+        element={
+          <RequireRole role="driver">
+            <DriverLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<Driver.HomePage />} />
+        <Route path="route" element={<Driver.MyRoutePage />} />
+        <Route path="collection" element={<Driver.CollectionPage />} />
+        <Route path="notifications" element={<Driver.NotificationsPage />} />
+        <Route path="profile" element={<Driver.ProfilePage />} />
+      </Route>
+
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
   )
 }

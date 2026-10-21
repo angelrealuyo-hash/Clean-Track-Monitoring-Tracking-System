@@ -1,0 +1,9 @@
+.ct-logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--ct-green-900);
+  border-radius: 8px;
+}
