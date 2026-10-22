@@ -208,3 +208,7 @@
     height: 280px;
   }
 }
+
+.stat-card__detail b.is-red {
+  color: var(--ct-red-600);
+}

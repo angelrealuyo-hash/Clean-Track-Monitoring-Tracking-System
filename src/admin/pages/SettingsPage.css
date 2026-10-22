@@ -1,0 +1,145 @@
+.settings-page {
+  max-width: 1100px;
+}
+
+.settings-section {
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.settings-section__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--ct-green-50);
+  border-bottom: 1px solid var(--ct-border);
+}
+
+.settings-section__head > div {
+  flex: 1;
+}
+
+.settings-section__head h2 {
+  font-size: 16px;
+}
+
+.settings-section__head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.settings-section__body {
+  padding: 16px;
+}
+
+.settings-hours {
+  gap: 0 14px;
+}
+
+.settings-box {
+  padding: 14px;
+  margin-bottom: 14px;
+  background: var(--ct-green-50);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+}
+
+.settings-box .ct-field {
+  margin-bottom: 0;
+}
+
+.settings-box__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.settings-value {
+  font-family: var(--ct-font-heading);
+  font-size: 18px;
+  color: var(--ct-green-900);
+}
+
+.settings-range {
+  width: 100%;
+  margin: 10px 0 4px;
+  accent-color: var(--ct-green-900);
+}
+
+.settings-range__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ct-text-muted);
+}
+
+.settings-toggles {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.settings-toggles .settings-toggle + .settings-toggle {
+  border-top: 1px solid var(--ct-border);
+}
+
+.settings-toggle > div {
+  flex: 1 1 260px;
+}
+
+.settings-toggle strong {
+  font-size: 14px;
+}
+
+.settings-toggle p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.settings-select {
+  width: auto;
+  min-width: 180px;
+}
+
+.settings-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 -24px -24px;
+  padding: 12px 24px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  font-size: 13px;
+  color: var(--ct-text-muted);
+  background: var(--ct-surface);
+  border-top: 1px solid var(--ct-border);
+}
+
+.settings-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .settings-footer {
+    margin: 0 -16px -16px;
+    padding-inline: 16px;
+  }
+}

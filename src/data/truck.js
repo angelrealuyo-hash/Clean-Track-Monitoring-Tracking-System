@@ -28,3 +28,6 @@ export const maintenanceTypes = [
   'Tire Replacement / Alignment',
   'Emergency Breakdown Service',
 ]
+
+export const vehicleTypes = ['Mini Compactor', 'Dump Truck', 'Utility Flatbed']
+export const fuelTypes = ['Diesel Euro-4', 'Diesel Euro-2', 'Gasoline', 'Electric']

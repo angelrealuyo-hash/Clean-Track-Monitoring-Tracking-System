@@ -8,17 +8,17 @@ import SimulationControls from '../components/SimulationControls.jsx'
 import RouteProgressModal from '../components/RouteProgressModal.jsx'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { STATUS_LABELS, STATUS_TONES } from '../../services/trackingSimulation.js'
-import { truck } from '../../data/truck.js'
-import { drivers } from '../../data/drivers.js'
+import { useData } from '../../store/dataContext.js'
 import { formatCoords, formatTime } from '../../utils/format.js'
 import '../components/AdminPage.css'
 import './LiveTrackingPage.css'
 
-const driver = drivers.find((d) => d.id === truck.driverId)
-
 // PDF pages 8-11 (Track, Live Tracking, View Route)
 export default function LiveTrackingPage() {
   const { route, state, progress, error, tickMs } = useTracking()
+  const { data } = useData()
+  const { truck } = data
+  const driver = data.drivers.find((d) => d.id === truck.driverId)
   const [routeOpen, setRouteOpen] = useState(false)
   const [focusRequest, setFocusRequest] = useState(null)
 

@@ -1,5 +1,7 @@
+import { Suspense } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import MobileFrame from './MobileFrame.jsx'
+import PageLoader from './PageLoader.jsx'
 import './MobileAppLayout.css'
 
 // Shared shell for the Resident and Driver apps: header + scrolling content
@@ -17,7 +19,9 @@ export default function MobileAppLayout({ header, tabs }) {
     <MobileFrame>
       <header className="mobile-header">{header}</header>
       <main className="mobile-content">
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
       <nav className="mobile-tabs" aria-label="Main">
         {tabs.map((tab) => {

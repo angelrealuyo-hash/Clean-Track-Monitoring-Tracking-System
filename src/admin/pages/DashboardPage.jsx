@@ -15,21 +15,14 @@ import StatusBadge from '../../components/StatusBadge.jsx'
 import StatCard from '../components/StatCard.jsx'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { STATUS_LABELS, STATUS_TONES, isCollectionStop } from '../../services/trackingSimulation.js'
-import { truck } from '../../data/truck.js'
-import { drivers } from '../../data/drivers.js'
-import { reports, reportCategories } from '../../data/reports.js'
-import { notifications } from '../../data/notifications.js'
-import { weeklySchedule } from '../../data/routes.js'
+import { reportCategories } from '../../data/reports.js'
+import { useData } from '../../store/dataContext.js'
+import { getCollectionSummary, getStopStatus, stopStatusMeta } from '../../store/selectors.js'
 import { formatDateTime, formatTime, todayName } from '../../utils/format.js'
 import '../components/AdminPage.css'
 import './DashboardPage.css'
 
-const driver = drivers.find((d) => d.id === truck.driverId)
-const onShift = drivers.filter((d) => d.status === 'on-shift').length
-const standby = drivers.filter((d) => d.status === 'standby').length
-const openReports = reports.filter((r) => r.status !== 'resolved')
 const categoryLabel = Object.fromEntries(reportCategories.map((c) => [c.id, c.label]))
-const recentActivity = notifications.filter((n) => n.audience === 'admin').slice(0, 3)
 
 // What the truck card says for each simulation status.
 const truckStatusText = {
@@ -40,17 +33,19 @@ const truckStatusText = {
   completed: 'Route finished · back at depot',
 }
 
-const stopBadge = {
-  collected: ['green', 'Collected'],
-  next: ['amber', 'Next stop'],
-  pending: ['gray', 'Pending'],
-}
-
 // PDF pages 3-4
 export default function DashboardPage() {
   const { route, state, progress, error } = useTracking()
+  const { data } = useData()
+  const { truck, drivers, collectionLog } = data
+  const driver = drivers.find((d) => d.id === truck.driverId)
+  const onShift = drivers.filter((d) => d.status === 'on-shift').length
+  const standby = drivers.filter((d) => d.status === 'standby').length
+  const openReports = data.reports.filter((r) => r.status !== 'resolved')
+  const recentActivity = data.notifications.filter((n) => n.audience === 'admin').slice(0, 3)
+  const summary = error ? null : getCollectionSummary(route, progress, collectionLog)
   const today = todayName()
-  const todaysRun = weeklySchedule.find((d) => d.day === today)
+  const todaysRun = data.weeklySchedule.find((d) => d.day === today)
 
   return (
     <div className="admin-page dashboard">
@@ -91,15 +86,16 @@ export default function DashboardPage() {
         <StatCard
           label="Collection Progress"
           icon={ClipboardCheck}
-          value={error ? '—' : `${progress.collected} / ${progress.total}`}
+          value={error ? '—' : `${summary.collected} / ${summary.total}`}
           unit="Stops"
           highlight
         >
           <div className="ct-progress">
-            <span style={{ width: `${progress?.percent ?? 0}%` }} />
+            <span style={{ width: `${summary?.percent ?? 0}%` }} />
           </div>
           <span>
-            <b>{progress?.percent ?? 0}%</b> of today&apos;s simulated route
+            <b>{summary?.percent ?? 0}%</b> collected · target {data.settings.completionTarget}%
+            {summary?.missed > 0 && <> · <b className="is-red">{summary.missed} missed</b></>}
           </span>
         </StatCard>
 
@@ -173,7 +169,7 @@ export default function DashboardPage() {
                     </div>
                     <span className="ct-mono">#{r.id}</span>
                     <p>{r.location}</p>
-                    <Link to="/admin/resident-reports" className="ct-btn ct-btn--soft">
+                    <Link to={`/admin/resident-reports?id=${r.id}`} className="ct-btn ct-btn--soft">
                       Review Report <ArrowRight size={14} />
                     </Link>
                   </li>
@@ -192,8 +188,8 @@ export default function DashboardPage() {
               <h2>Today&apos;s Route &amp; Schedule</h2>
               <p>{today}</p>
             </div>
-            <Link to="/admin/routes" className="ct-link-btn">
-              Routes &amp; Schedules →
+            <Link to="/admin/collection" className="ct-link-btn">
+              Collection Monitoring →
             </Link>
           </div>
           <div className="ct-card__body dashboard__route">
@@ -219,7 +215,7 @@ export default function DashboardPage() {
               ) : (
                 <ul className="dashboard__stops">
                   {route.stops.filter(isCollectionStop).map((stop) => {
-                    const [tone, label] = stopBadge[progress.statusOf(stop)]
+                    const { tone, label } = stopStatusMeta[getStopStatus(stop, progress, collectionLog)]
                     return (
                       <li key={stop.id}>
                         <span>

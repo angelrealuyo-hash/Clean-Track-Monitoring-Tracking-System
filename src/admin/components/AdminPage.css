@@ -46,3 +46,22 @@
     font-size: 20px;
   }
 }
+
+.admin-page__badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 10px;
+  font-family: var(--ct-font);
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-radius: 999px;
+}
+
+.admin-page__subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--ct-text-muted);
+}

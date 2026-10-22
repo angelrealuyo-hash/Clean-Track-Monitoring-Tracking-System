@@ -1,0 +1,130 @@
+/* Bar list */
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-list__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr 32px;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+  font-size: 13px;
+  border-radius: 4px;
+  outline-offset: 2px;
+}
+
+.bar-list__label {
+  color: var(--ct-text);
+}
+
+.bar-list__track {
+  position: relative;
+  height: 14px;
+  background: #e7f0ea;
+  border-radius: 4px;
+}
+
+.bar-list__bar {
+  display: block;
+  min-width: 4px;
+  height: 100%;
+  background: var(--ct-green-700);
+  border-radius: 4px;
+}
+
+.bar-list__value {
+  font-weight: 700;
+  text-align: right;
+  color: var(--ct-text);
+}
+
+/* Stacked status bar */
+.status-bar__track {
+  display: flex;
+  gap: 2px; /* surface gap between segments */
+  height: 22px;
+}
+
+.status-bar__seg {
+  position: relative;
+  min-width: 6px;
+  outline-offset: 2px;
+}
+
+.status-bar__seg:first-child { border-radius: 4px 0 0 4px; }
+.status-bar__seg:last-child { border-radius: 0 4px 4px 0; }
+.status-bar__seg:only-child { border-radius: 4px; }
+
+.status-bar__empty {
+  flex: 1;
+  font-size: 12px;
+  line-height: 22px;
+  text-align: center;
+  color: var(--ct-text-muted);
+  background: #e7f0ea;
+  border-radius: 4px;
+}
+
+.status-bar .is-collected { background: var(--ct-green-900); }
+.status-bar .is-next { background: var(--ct-amber-500); }
+.status-bar .is-pending { background: #b9c9bf; }
+.status-bar .is-missed { background: var(--ct-red-600); }
+
+.status-bar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 12px;
+  list-style: none;
+  color: var(--ct-text-muted);
+}
+
+.status-bar__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-bar__legend strong {
+  color: var(--ct-text);
+}
+
+.status-bar__legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* Hover / focus tooltip. Hidden with display:none (not just transparent) so
+   it never widens the page on small screens. */
+.chart-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  display: none;
+  width: max-content;
+  max-width: min(260px, 70vw);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ct-text);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.bar-list__row:hover .chart-tip,
+.bar-list__row:focus-visible .chart-tip,
+.status-bar__seg:hover .chart-tip,
+.status-bar__seg:focus-visible .chart-tip {
+  display: block;
+}

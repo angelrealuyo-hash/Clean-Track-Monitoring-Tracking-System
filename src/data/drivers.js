@@ -19,3 +19,9 @@ export const drivers = [
     status: 'standby',
   },
 ]
+
+export const shiftOptions = [
+  'Morning Shift (06:00 AM - 02:00 PM)',
+  'Afternoon Shift (02:00 PM - 10:00 PM)',
+  'Relief Driver',
+]

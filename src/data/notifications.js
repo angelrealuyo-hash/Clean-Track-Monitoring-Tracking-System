@@ -1,8 +1,8 @@
 // audience: 'admin' | 'resident' | 'driver'
 // priority: 'high' | 'medium' | 'low'
 export const notifications = [
-  { id: 'N-001', audience: 'admin', priority: 'high', title: 'Missed collection reported at Narra St.', body: 'Resident report REP-2024-094 lodged for Purok 2.', time: '2024-10-24T08:35:00', read: false },
-  { id: 'N-002', audience: 'admin', priority: 'medium', title: 'TRK-01 schedule delayed > 15 min', body: 'Heavy traffic on Rizal Avenue.', time: '2024-10-24T08:04:00', read: false },
+  { id: 'N-001', audience: 'admin', priority: 'high', title: 'Missed collection reported at Narra St.', body: 'Resident report REP-2024-094 lodged for Purok 2.', time: '2024-10-24T08:35:00', read: false, link: { label: 'Open report REP-2024-094', to: '/admin/resident-reports?id=REP-2024-094' } },
+  { id: 'N-002', audience: 'admin', priority: 'medium', title: 'TRK-01 schedule delayed > 15 min', body: 'Heavy traffic on Rizal Avenue.', time: '2024-10-24T08:04:00', read: false, link: { label: 'Open Live Tracking', to: '/admin/live-tracking' } },
   { id: 'N-003', audience: 'admin', priority: 'low', title: 'Carlos Ortiz started shift', body: 'Pre-trip checklist completed.', time: '2024-10-24T06:15:00', read: true },
   { id: 'N-101', audience: 'resident', priority: 'high', title: 'Garbage truck TRK-01 nearby!', body: 'The truck is entering Purok 2. Estimated arrival: 8-12 minutes.', time: '2024-10-24T08:50:00', read: false },
   { id: 'N-102', audience: 'resident', priority: 'medium', title: 'Update on report REP-2024-094', body: 'Your missed bin will be collected by 11:30 AM.', time: '2024-10-24T09:27:00', read: false },

@@ -1,0 +1,11 @@
+.routes-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.routes-progress {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}

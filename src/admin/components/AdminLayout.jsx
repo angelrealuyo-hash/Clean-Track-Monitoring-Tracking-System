@@ -1,23 +1,14 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, LogOut, Menu, X } from 'lucide-react'
 import Logo from '../../components/Logo.jsx'
+import PageLoader from '../../components/PageLoader.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useAuth } from '../../auth/authContext.js'
-import { barangay } from '../../data/barangay.js'
-import { reports } from '../../data/reports.js'
-import { notifications } from '../../data/notifications.js'
+import { useData } from '../../store/dataContext.js'
 import { adminNavGroups, findNavItem } from './adminNav.js'
 import './AdminLayout.css'
 
-const openReports = reports.filter((r) => r.status !== 'resolved').length
-const unreadAdmin = notifications.filter((n) => n.audience === 'admin' && !n.read).length
-
-const badges = {
-  truck: { text: '1 Truck', className: 'admin-nav__badge--soft' },
-  reports: openReports ? { text: openReports, className: 'admin-nav__badge--amber' } : null,
-  notifications: unreadAdmin ? { text: unreadAdmin, className: 'admin-nav__badge--red' } : null,
-}
 
 export default function AdminLayout() {
   const { sessions, logout } = useAuth()
@@ -25,6 +16,15 @@ export default function AdminLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { data } = useData()
+
+  const openReports = data.reports.filter((r) => r.status !== 'resolved').length
+  const unreadAdmin = data.notifications.filter((n) => n.audience === 'admin' && !n.read).length
+  const badges = {
+    truck: { text: '1 Truck', className: 'admin-nav__badge--soft' },
+    reports: openReports ? { text: openReports, className: 'admin-nav__badge--amber' } : null,
+    notifications: unreadAdmin ? { text: unreadAdmin, className: 'admin-nav__badge--red' } : null,
+  }
 
   const current = findNavItem(location.pathname)
 
@@ -105,7 +105,7 @@ export default function AdminLayout() {
           <nav className="admin-breadcrumb" aria-label="Breadcrumb">
             <span>CleanTrack</span>
             <span className="admin-breadcrumb__sep">/</span>
-            <span>{barangay.name}</span>
+            <span>{data.settings.barangayName}</span>
             <span className="admin-breadcrumb__sep">/</span>
             <strong>{current?.label ?? 'Admin'}</strong>
           </nav>
@@ -121,7 +121,9 @@ export default function AdminLayout() {
           </div>
         </header>
         <main className="admin-content">
-          <Outlet />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

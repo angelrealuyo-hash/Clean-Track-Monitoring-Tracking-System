@@ -16,6 +16,14 @@ export default function TrackingProvider({ children, route = defaultRoute, tickM
   const [state, setState] = useState(() => getInitialState(route))
   const error = validateRoute(route)
 
+  // A new route or speed means a fresh simulation from the first stop
+  // (the effect below builds a new engine; this resets what screens show).
+  const [inputs, setInputs] = useState({ route, tickMs })
+  if (inputs.route !== route || inputs.tickMs !== tickMs) {
+    setInputs({ route, tickMs })
+    setState(getInitialState(route))
+  }
+
   useEffect(() => {
     if (error) return undefined
     const engine = createTrackingSimulation({ route, tickMs, onChange: setState })

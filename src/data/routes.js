@@ -44,3 +44,20 @@ export const weeklySchedule = [
   { day: 'Saturday', wasteType: 'Hazardous & Electronic Waste (Drop-off)', window: '09:00 AM - 12:00 PM' },
   { day: 'Sunday', wasteType: 'No collection', window: '-' },
 ]
+
+export const wasteTypes = [
+  'Biodegradable (Kitchen & Yard Waste)',
+  'Recyclables (Plastics, Cartons, Metals)',
+  'Residual Non-Recyclable Waste',
+  'Hazardous & Electronic Waste (Drop-off)',
+  'No collection',
+]
+
+// Reasons an admin can record when a stop is missed (Collection Monitoring).
+export const missedReasons = [
+  'Road blocked / alley not accessible',
+  'Bins not placed outside',
+  'Truck problem / breakdown',
+  'Ran out of time in collection window',
+  'Other',
+]
