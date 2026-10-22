@@ -54,3 +54,30 @@ export const priorityMeta = {
   medium: { tone: 'amber', label: 'Medium' },
   low: { tone: 'green', label: 'Low / Info' },
 }
+
+// Notifications a resident should see: messages for them personally, and
+// broadcasts for their purok or the whole barangay.
+export function notificationsForResident(notifications, resident) {
+  if (!resident) return []
+  return notifications.filter((n) => {
+    if (n.audience !== 'resident') return false
+    if (n.residentId) return n.residentId === resident.id
+    if (n.zone) return n.zone === 'All Puroks' || n.zone === resident.purok
+    return true
+  })
+}
+
+// How far the simulated truck is from the first stop in a purok.
+// Returns { state: 'not-started' | 'approaching' | 'here' | 'passed' | 'none', stopsAway, stop }
+export function truckDistanceToPurok(route, sim, purok) {
+  const index = route.stops.findIndex((s) => s.purok === purok)
+  if (index === -1) return { state: 'none', stopsAway: null, stop: null }
+  const stop = route.stops[index]
+  if (sim.status === 'idle') return { state: 'not-started', stopsAway: null, stop }
+  if (sim.status === 'completed' || sim.legIndex >= index) {
+    const atStop = sim.legIndex === index && sim.step === 0
+    return { state: atStop ? 'here' : 'passed', stopsAway: 0, stop }
+  }
+  const stopsAway = index - sim.legIndex - 1 // stops still to visit before this one
+  return { state: stopsAway === 0 ? 'here' : 'approaching', stopsAway, stop }
+}

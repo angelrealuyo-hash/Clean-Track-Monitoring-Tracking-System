@@ -1,0 +1,119 @@
+.drv-gap { margin-top: 10px; }
+
+.drv-start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  font-weight: 700;
+  color: #fff;
+  text-align: left;
+  text-decoration: none;
+  background: var(--ct-green-700);
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.drv-start:hover { background: var(--ct-green-900); }
+
+.drv-start small {
+  display: block;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.drv-start .m-icon {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.drv-start > :last-child { margin-left: auto; }
+
+.drv-target {
+  border-top: 4px solid var(--ct-green-900);
+}
+
+.drv-target h2 {
+  margin: 6px 0 2px;
+  font-size: 18px;
+}
+
+.drv-stop {
+  display: flex;
+  gap: 10px;
+}
+
+.drv-stop__num {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-radius: 6px;
+}
+
+.drv-stop.is-next {
+  border: 2px solid var(--ct-green-900);
+}
+
+.drv-stop.is-next .drv-stop__num {
+  color: #fff;
+  background: var(--ct-green-900);
+}
+
+.drv-stop.is-missed {
+  background: #fff7f6;
+  border-color: #f6c2be;
+}
+
+.drv-stop.is-collected .drv-stop__num {
+  color: var(--ct-text-muted);
+  background: #eef1ef;
+}
+
+.drv-note {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--ct-red-600);
+  background: var(--ct-red-100);
+  border-radius: 6px;
+}
+
+.drv-counter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drv-counter button {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ct-green-900);
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.drv-counter output {
+  min-width: 28px;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.drv-done {
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-color: #bfe3cc;
+}

@@ -11,8 +11,10 @@ export default function SignOutButton({ role, label = 'Sign Out' }) {
       type="button"
       className="ct-btn ct-btn--danger ct-btn--block"
       onClick={() => {
-        logout(role)
+        // Leave the page first, so the sign-in page does not remember this
+        // page as "where to go back to" after the next sign-in.
         navigate(`/${role}/login`, { replace: true })
+        logout(role)
       }}
     >
       <LogOut size={16} />

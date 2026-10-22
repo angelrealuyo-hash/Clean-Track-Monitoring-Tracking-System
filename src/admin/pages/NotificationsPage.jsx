@@ -186,6 +186,7 @@ export default function NotificationsPage() {
                   <strong>{selected.title}</strong>
                 </p>
                 <p>{selected.body}</p>
+                {selected.photo && <img className="notif-photo" src={selected.photo} alt="Photo sent with this alert" />}
               </DetailSection>
               <DetailSection title="Status">
                 <p>{selected.read ? 'Read' : 'Unread'}</p>

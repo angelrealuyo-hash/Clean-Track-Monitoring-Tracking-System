@@ -31,3 +31,14 @@
 @keyframes ct-toast-in {
   from { opacity: 0; transform: translateY(8px); }
 }
+
+/* Phones: show at the top so the bottom tab bar stays usable. */
+@media (max-width: 600px) {
+  .ct-toasts {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    max-width: none;
+  }
+}

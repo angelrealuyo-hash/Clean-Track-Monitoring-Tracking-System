@@ -8,7 +8,8 @@ import { reports } from '../data/reports.js'
 import { notifications, residentBroadcasts } from '../data/notifications.js'
 import { demoUsers } from '../data/users.js'
 
-export const DATA_VERSION = 1
+// Bump when the saved shape changes; older saved data is replaced.
+export const DATA_VERSION = 2
 
 export const defaultSettings = {
   barangayName: barangay.name,
@@ -28,6 +29,8 @@ export const defaultSettings = {
 
 const clone = (v) => structuredClone(v)
 
+export const defaultResidentPrefs = { email: true, push: true, scheduleReminders: true, truckNearby: true }
+
 export function createInitialData() {
   return {
     version: DATA_VERSION,
@@ -35,8 +38,13 @@ export function createInitialData() {
     drivers: clone(drivers),
     route: clone(route),
     weeklySchedule: clone(weeklySchedule),
+    // Resident accounts. The demo resident is first; "Create Account" adds more.
+    // DEMO ONLY: passwords are stored in plain text because there is no server.
+    residents: [{ ...clone(demoUsers.resident), prefs: { ...defaultResidentPrefs }, createdAt: '2024-09-01T08:00:00' }],
     reports: clone(reports).map((r) => ({
       ...r,
+      photo: null,
+      smsUpdates: true,
       residentName: r.residentId === demoUsers.resident.id ? demoUsers.resident.name : 'Resident',
       residentPhone: r.residentId === demoUsers.resident.id ? demoUsers.resident.phone : null,
       history: [{ at: r.submittedAt, text: 'Report submitted by resident' }],

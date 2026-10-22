@@ -30,6 +30,21 @@ export default function DataProvider({ children }) {
     }
   }, [data])
 
+  // Keep several open tabs in step (e.g. Admin in one tab, Resident in another).
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key !== STORAGE_KEY || !e.newValue) return
+      try {
+        const incoming = JSON.parse(e.newValue)
+        if (incoming?.version === DATA_VERSION) dispatch({ type: 'sync', payload: incoming })
+      } catch {
+        // Ignore unreadable data from another tab.
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
   const reset = useCallback(() => dispatch({ type: 'reset', payload: createInitialData() }), [])
 
   const value = useMemo(() => ({ data, dispatch, reset }), [data, reset])

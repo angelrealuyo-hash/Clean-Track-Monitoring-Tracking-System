@@ -1,10 +1,11 @@
-// Demo-only sign-in. There is no backend: credentials are checked against
-// data/users.js. Each app (admin, resident, driver) has its own session so
-// you can be signed in to all three at once while testing.
-import { useState } from 'react'
+// Demo-only sign-in. There is no backend: admin and driver accounts come from
+// data/users.js, resident accounts from the data store (so "Create Account"
+// works). Each app (admin, resident, driver) has its own session, so you can be
+// signed in to all three at once while testing.
+import { useCallback, useMemo, useState } from 'react'
 import { AuthContext } from './authContext.js'
 import { demoUsers } from '../data/users.js'
-import { drivers } from '../data/drivers.js'
+import { useData } from '../store/dataContext.js'
 
 const STORAGE_KEY = 'cleantrack.sessions'
 
@@ -24,52 +25,67 @@ function write(store, data) {
   }
 }
 
-// The profile stored in the session (never includes the password).
-function profileFor(role) {
-  const profile = { ...demoUsers[role] }
-  delete profile.password
-  if (role === 'driver') {
-    return { ...drivers.find((d) => d.id === profile.id), email: profile.email }
-  }
-  return profile
-}
+const sameEmail = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
 export default function AuthProvider({ children }) {
+  const { data } = useData()
   // "Remember me" sessions live in localStorage; others only for this tab.
   const [sessions, setSessions] = useState(() => ({
     ...read(localStorage),
     ...read(sessionStorage),
   }))
 
-  function login(role, email, password, remember = false) {
-    const user = demoUsers[role]
-    const ok =
-      user &&
-      email.trim().toLowerCase() === user.email.toLowerCase() &&
-      password === user.password
-    if (!ok) return false
+  // Apps the user signed out of on purpose. Their login page then opens the
+  // app's home after the next sign-in, not the page they were on.
+  const [signedOut, setSignedOut] = useState({})
 
-    const profile = profileFor(role)
-    setSessions((s) => ({ ...s, [role]: profile }))
-    write(sessionStorage, { ...read(sessionStorage), [role]: profile })
-    if (remember) write(localStorage, { ...read(localStorage), [role]: profile })
-    return true
-  }
+  const start = useCallback((role, session, remember) => {
+    setSignedOut((s) => ({ ...s, [role]: false }))
+    setSessions((s) => ({ ...s, [role]: session }))
+    write(sessionStorage, { ...read(sessionStorage), [role]: session })
+    if (remember) write(localStorage, { ...read(localStorage), [role]: session })
+  }, [])
 
-  function logout(role) {
+  // Returns true when the email/password match an account for that app.
+  const login = useCallback(
+    (role, email, password, remember = false) => {
+      let session = null
+      if (role === 'resident') {
+        const r = data.residents.find((x) => sameEmail(x.email, email) && x.password === password)
+        if (r) session = { id: r.id }
+      } else {
+        const u = demoUsers[role]
+        if (u && sameEmail(u.email, email) && u.password === password) {
+          session = role === 'driver' ? { id: u.id } : { id: 'ADMIN', name: u.name, title: u.title, initials: u.initials }
+        }
+      }
+      if (!session) return false
+      start(role, session, remember)
+      return true
+    },
+    [data.residents, start],
+  )
+
+  // Signs in an account that was just created (Create Account).
+  const loginAs = useCallback((role, id, remember = true) => start(role, { id }, remember), [start])
+
+  const logout = useCallback((role) => {
+    setSignedOut((s) => ({ ...s, [role]: true }))
     setSessions((s) => {
       const next = { ...s }
       delete next[role]
       return next
     })
     for (const store of [sessionStorage, localStorage]) {
-      const data = read(store)
-      delete data[role]
-      write(store, data)
+      const saved = read(store)
+      delete saved[role]
+      write(store, saved)
     }
-  }
+  }, [])
 
-  return (
-    <AuthContext.Provider value={{ sessions, login, logout }}>{children}</AuthContext.Provider>
+  const value = useMemo(
+    () => ({ sessions, signedOut, login, loginAs, logout }),
+    [sessions, signedOut, login, loginAs, logout],
   )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -5,6 +5,7 @@ import MobileFrame from '../../components/MobileFrame.jsx'
 import Logo from '../../components/Logo.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useAuth } from '../../auth/authContext.js'
+import { useIsSignedIn } from '../../auth/useAccount.js'
 import { demoUsers } from '../../data/users.js'
 import { drivers } from '../../data/drivers.js'
 import { truck } from '../../data/truck.js'
@@ -15,7 +16,8 @@ const demoDriver = drivers.find((d) => d.id === demoUsers.driver.id)
 
 // PDF page 44
 export default function LoginPage() {
-  const { sessions, login } = useAuth()
+  const { login } = useAuth()
+  const signedIn = useIsSignedIn('driver')
   const location = useLocation()
 
   const [email, setEmail] = useState('')
@@ -26,7 +28,7 @@ export default function LoginPage() {
   const [showForgot, setShowForgot] = useState(false)
 
   // Once signed in, go to the page they originally asked for (or the app's home).
-  if (sessions.driver) return <Navigate to={location.state?.from || '/driver'} replace />
+  if (signedIn) return <Navigate to={location.state?.from || '/driver'} replace />
 
   function signIn(emailValue, passwordValue) {
     // On success, the redirect at the top of this component takes over.

@@ -1,7 +1,7 @@
 // Every change to the demo data goes through here.
 const now = () => new Date().toISOString()
 
-function nextId(prefix, items, width = 2) {
+export function nextId(prefix, items, width = 2) {
   const max = items.reduce((m, it) => {
     const n = Number(String(it.id).split('-').pop())
     return Number.isFinite(n) && n > m ? n : m
@@ -130,9 +130,11 @@ export function dataReducer(state, action) {
         // Let the resident know in their app.
         notifications: addNotification(state, {
           audience: 'resident',
+          residentId: report.residentId,
           priority: 'medium',
           title: `Update on report ${report.id}`,
           body: updated.adminResponse || `Your report is now ${p.statusLabel ?? updated.status}.`,
+          link: { label: 'View Report', to: `/resident/reports/${report.id}` },
         }),
       }
     }
@@ -144,10 +146,93 @@ export function dataReducer(state, action) {
       }
 
     case 'notification/markAllRead':
+      // Either every notification for an audience, or a given list of ids.
       return {
         ...state,
-        notifications: state.notifications.map((n) => (n.audience === p.audience ? { ...n, read: true } : n)),
+        notifications: state.notifications.map((n) =>
+          (p.ids ? p.ids.includes(n.id) : n.audience === p.audience) ? { ...n, read: true } : n,
+        ),
       }
+
+    case 'resident/add': {
+      const num = p.id.split('-').pop()
+      const resident = {
+        ...p,
+        initials: initials(p.name),
+        householdId: `HH-SANANTONIO-${num}`,
+        prefs: { email: true, push: true, scheduleReminders: true, truckNearby: true },
+        createdAt: now(),
+      }
+      return { ...state, residents: [...state.residents, resident] }
+    }
+
+    case 'resident/update':
+      return {
+        ...state,
+        residents: state.residents.map((r) =>
+          r.id === p.id ? { ...r, ...p.patch, ...(p.patch.name ? { initials: initials(p.patch.name) } : {}) } : r,
+        ),
+      }
+
+    case 'report/add': {
+      const year = new Date().getFullYear()
+      const report = {
+        ...p,
+        id: p.id ?? nextId(`REP-${year}`, state.reports, 3),
+        status: 'submitted',
+        submittedAt: now(),
+        adminResponse: null,
+        history: [{ at: now(), text: 'Report submitted by resident' }],
+      }
+      return {
+        ...state,
+        reports: [report, ...state.reports],
+        notifications: addNotification(state, {
+          audience: 'admin',
+          priority: p.category === 'missed' || p.category === 'no-truck' ? 'high' : 'medium',
+          title: `New resident report ${report.id}`,
+          body: `${p.categoryLabel} at ${p.location}.`,
+          link: { label: `Open report ${report.id}`, to: `/admin/resident-reports?id=${report.id}` },
+        }),
+      }
+    }
+
+    case 'driver/reportIssue': {
+      let next = state
+      if (p.notifyDispatch) {
+        next = {
+          ...next,
+          notifications: addNotification(next, {
+            audience: 'admin',
+            priority: 'high',
+            title: `Driver issue at ${p.stopName}: ${p.issueLabel}`,
+            body: `${p.driverName}: ${p.description}`,
+            photo: p.photo ?? null,
+            link: { label: 'Open Collection Monitoring', to: '/admin/collection' },
+          }),
+        }
+      }
+      if (p.markMissed) {
+        next = {
+          ...next,
+          collectionLog: {
+            ...next.collectionLog,
+            [p.stopId]: { status: 'missed', note: `${p.issueLabel} — ${p.description} (reported by driver)`, at: now() },
+          },
+        }
+      }
+      return next
+    }
+
+    // Another browser tab saved newer data. Keep unchanged parts as the same
+    // objects so, e.g., a running simulation is not restarted needlessly.
+    case 'sync': {
+      const merged = { ...p }
+      for (const key of Object.keys(p)) {
+        if (JSON.stringify(state[key]) === JSON.stringify(p[key])) merged[key] = state[key]
+      }
+      return merged
+    }
 
     case 'broadcast/add': {
       const broadcast = { id: nextId('B', state.broadcasts), sentAt: now(), ...p }
@@ -160,6 +245,7 @@ export function dataReducer(state, action) {
           title: p.subject,
           body: p.message,
           zone: p.zone,
+          kind: 'advisory',
         }),
       }
     }

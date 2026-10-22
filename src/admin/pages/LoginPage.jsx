@@ -15,13 +15,15 @@ import Logo from '../../components/Logo.jsx'
 import Modal from '../../components/Modal.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useAuth } from '../../auth/authContext.js'
+import { useIsSignedIn } from '../../auth/useAccount.js'
 import { demoUsers } from '../../data/users.js'
 import { barangay } from '../../data/barangay.js'
 import './LoginPage.css'
 
 // PDF pages 1-2
 export default function LoginPage() {
-  const { sessions, login } = useAuth()
+  const { login } = useAuth()
+  const signedIn = useIsSignedIn('admin')
   const location = useLocation()
 
   const [email, setEmail] = useState('')
@@ -36,7 +38,7 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false)
 
   // Once signed in, go to the page they originally asked for (or the app's home).
-  if (sessions.admin) return <Navigate to={location.state?.from || '/admin'} replace />
+  if (signedIn) return <Navigate to={location.state?.from || '/admin'} replace />
 
   function autoFill() {
     setEmail(demoUsers.admin.email)

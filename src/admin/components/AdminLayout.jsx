@@ -5,6 +5,7 @@ import Logo from '../../components/Logo.jsx'
 import PageLoader from '../../components/PageLoader.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useAuth } from '../../auth/authContext.js'
+import { demoUsers } from '../../data/users.js'
 import { useData } from '../../store/dataContext.js'
 import { adminNavGroups, findNavItem } from './adminNav.js'
 import './AdminLayout.css'
@@ -12,7 +13,8 @@ import './AdminLayout.css'
 
 export default function AdminLayout() {
   const { sessions, logout } = useAuth()
-  const user = sessions.admin
+  // Older saved sessions may lack these fields; fall back to the demo admin.
+  const user = { ...demoUsers.admin, ...sessions.admin }
   const location = useLocation()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -29,8 +31,9 @@ export default function AdminLayout() {
   const current = findNavItem(location.pathname)
 
   function signOut() {
-    logout('admin')
+    // Navigate first so the next sign-in starts at the Dashboard.
     navigate('/admin/login', { replace: true })
+    logout('admin')
   }
 
   return (
