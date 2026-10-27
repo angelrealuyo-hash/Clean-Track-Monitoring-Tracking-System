@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Server database (local data; never commit)
+server/data/
+.env
+tests/e2e/screenshots/

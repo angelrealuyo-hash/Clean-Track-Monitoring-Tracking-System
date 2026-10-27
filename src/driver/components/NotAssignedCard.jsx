@@ -9,10 +9,9 @@ export default function NotAssignedCard({ truckId }) {
         <TriangleAlert size={16} />
       </span>
       <div className="m-grow">
-        <strong>You are not assigned to {truckId} today</strong>
+        <strong>You are not driving {truckId} today</strong>
         <p className="m-muted">
-          Route actions are turned off. Ask the barangay office ({barangay.hotline}) to assign you in Truck
-          Management.
+          Please call the Barangay office ({barangay.hotline}) so they can assign you.
         </p>
       </div>
     </section>

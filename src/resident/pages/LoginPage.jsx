@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
-import { ArrowRight, Bell, Eye, EyeOff, Info, Lock, Truck, User, Zap } from 'lucide-react'
+import { ArrowRight, Bell, Eye, EyeOff, Info, Lock, User, Zap } from 'lucide-react'
 import MobileFrame from '../../components/MobileFrame.jsx'
 import Logo from '../../components/Logo.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
@@ -25,16 +25,20 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [showForgot, setShowForgot] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   // Once signed in, go to the page they originally asked for (or the app's home).
   if (signedIn) return <Navigate to={location.state?.from || '/resident'} replace />
 
-  function signIn(emailValue, passwordValue) {
+  async function signIn(emailValue, passwordValue) {
+    if (busy) return
+    setBusy(true)
+    const res = await login('resident', emailValue, passwordValue, remember)
+    setBusy(false)
     // On success, the redirect at the top of this component takes over.
-    if (!login('resident', emailValue, passwordValue, remember)) {
-      setError('Incorrect email or password. Try the Quick Demo button below.')
-    }
+    if (!res.ok) setError(res.error || 'Wrong email or password.')
   }
+
 
   return (
     <MobileFrame>
@@ -46,16 +50,14 @@ export default function LoginPage() {
         </div>
 
         <span className="m-auth__pill">
-          <StatusBadge tone="green">Student Project Prototype · Simulated Demo</StatusBadge>
+          <StatusBadge tone="green">Demo app</StatusBadge>
         </span>
 
         <div className="m-auth__card m-auth__hero">
-          <span className="ct-logo" style={{ width: 40, height: 40 }}>
-            <Truck size={22} />
-          </span>
+          <Logo size={44} />
           <div>
             <strong>CleanTrack</strong>
-            <p>Resident Portal · {barangay.name}</p>
+            <p>For barangay residents</p>
           </div>
         </div>
 
@@ -67,7 +69,7 @@ export default function LoginPage() {
           }}
         >
           <h2>Resident Sign In</h2>
-          <p>Stay updated with barangay garbage truck schedules and pickup alerts.</p>
+          <p>See where the garbage truck is and tell the Barangay about problems.</p>
 
           {error && (
             <div className="ct-alert ct-alert--error" role="alert">
@@ -77,15 +79,15 @@ export default function LoginPage() {
 
           <div className="ct-field">
             <label className="ct-label" htmlFor="res-email">
-              Email Address
+              Email or mobile number
             </label>
             <div className="ct-input-group">
               <User size={16} />
               <input
                 id="res-email"
-                type="email"
+                type="text"
                 autoComplete="username"
-                placeholder="you@email.com"
+                placeholder="you@email.com or 0917 555 0192"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -138,11 +140,11 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block">
+          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block" disabled={busy}>
             Sign In as Resident <ArrowRight size={16} />
           </button>
 
-          <div className="ct-divider-text">OR TRY THE DEMO</div>
+          <div className="ct-divider-text">OR</div>
 
           <button
             type="button"
@@ -151,7 +153,7 @@ export default function LoginPage() {
           >
             <Zap size={18} color="var(--ct-amber-500)" />
             <span>
-              Quick Demo: Enter as {shortName}
+              Try the demo as {shortName}
               <small>{demoUsers.resident.purok}</small>
             </span>
             <ArrowRight size={16} />
@@ -159,14 +161,12 @@ export default function LoginPage() {
         </form>
 
         <p className="m-auth__switch">
-          Don&apos;t have an account? <Link to="/resident/register">Create Resident Account</Link>
+          Don&apos;t have an account? <Link to="/resident/register">Create an account</Link>
         </p>
 
         <footer className="m-auth__footer">
-          <strong>Barangay Solid Waste Office</strong>
-          {barangay.lgu}
-          <br />
-          Hotline: {barangay.hotline}
+          <strong>Need help? Call {barangay.hotline}</strong>
+          Barangay garbage office
         </footer>
       </div>
     </MobileFrame>

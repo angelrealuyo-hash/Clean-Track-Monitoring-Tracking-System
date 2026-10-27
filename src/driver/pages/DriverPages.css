@@ -117,3 +117,13 @@
   background: var(--ct-green-100);
   border-color: #bfe3cc;
 }
+
+.drv-waiting {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-radius: 8px;
+}

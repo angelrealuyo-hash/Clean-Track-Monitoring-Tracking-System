@@ -32,6 +32,7 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [autoFilled, setAutoFilled] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const [forgotOpen, setForgotOpen] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
@@ -47,14 +48,19 @@ export default function LoginPage() {
     setAutoFilled(true)
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    const res = await login('admin', email, password, remember)
+    setBusy(false)
     // On success, the redirect at the top of this component takes over.
-    if (!login('admin', email, password, remember)) {
+    if (!res.ok) {
       setAutoFilled(false)
-      setError('Incorrect email or password. Use Auto Fill to load the demo account.')
+      setError(res.error || 'Incorrect email or password.')
     }
   }
+
 
   function closeForgot() {
     setForgotOpen(false)
@@ -67,7 +73,7 @@ export default function LoginPage() {
         <Logo size={26} />
         <strong>CleanTrack</strong>
         <span className="admin-login__bar-sep">/</span>
-        <span>{barangay.name} Solid Waste Office</span>
+        <span>{barangay.lgu}</span>
         <div className="admin-login__bar-right">
           <StatusBadge tone="green">Simulated Demo Mode</StatusBadge>
         </div>
@@ -76,7 +82,7 @@ export default function LoginPage() {
       <main className="admin-login__body">
         <form className="admin-login__card" onSubmit={handleSubmit}>
           <div className="admin-login__brand">
-            <Logo size={52} />
+            <Logo size={80} />
             <h1>CleanTrack</h1>
             <p>Barangay Waste Management Portal</p>
           </div>
@@ -163,9 +169,9 @@ export default function LoginPage() {
             Remember this computer
           </label>
 
-          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block">
+          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block" disabled={busy}>
             <LogIn size={16} />
-            Sign In
+            {busy ? 'Signing in…' : 'Sign In'}
           </button>
 
           <p className="admin-login__help">
@@ -175,7 +181,7 @@ export default function LoginPage() {
       </main>
 
       <footer className="admin-login__footer">
-        <span>© 2025 CleanTrack · {barangay.name}</span>
+        <span>© 2025 CleanTrack</span>
         <span>Student project prototype · All truck locations are simulated</span>
       </footer>
 

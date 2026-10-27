@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Clock, MapPin, Package, Pencil, Route as RouteIcon, Truck, TriangleAlert } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, Clock, MapPin, MapPinPlus, Package, Pencil, Route as RouteIcon, Trash2, Truck, TriangleAlert } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
 import DetailPanel, { DetailSection } from '../components/DetailPanel.jsx'
 import EditRouteModal from '../components/routes/EditRouteModal.jsx'
 import EditStopModal from '../components/routes/EditStopModal.jsx'
 import EditScheduleModal from '../components/routes/EditScheduleModal.jsx'
+import AddStopModal from '../components/routes/AddStopModal.jsx'
+import ConfirmModal from '../../components/ConfirmModal.jsx'
+import { stopStatusMeta } from '../../store/selectors.js'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useTracking } from '../../tracking/trackingContext.js'
@@ -27,7 +30,7 @@ export default function RoutesSchedulesPage() {
   const { route, truck, drivers, weeklySchedule } = data
   const driver = drivers.find((d) => d.id === truck.driverId)
   const collectionStops = route.stops.filter(isCollectionStop)
-  const totalBins = collectionStops.reduce((n, s) => n + s.bins, 0)
+  const totalHouseholds = collectionStops.reduce((n, s) => n + s.households, 0)
   const puroks = [...new Set(collectionStops.map((s) => s.purok))]
   const collectionDays = weeklySchedule.filter((d) => d.wasteType !== 'No collection').length
   const simRunning = sim.status === 'running' || sim.status === 'paused'
@@ -51,7 +54,7 @@ export default function RoutesSchedulesPage() {
         <StatCard label="Collection Stops" icon={MapPin} value={collectionStops.length} unit="stops">
           <span>Covering {puroks.join(', ')}</span>
         </StatCard>
-        <StatCard label="Bins on Route" icon={Package} value={totalBins} unit="bins">
+        <StatCard label="Households Served" icon={Package} value={totalHouseholds} unit="households">
           <span>Sum of all stops</span>
         </StatCard>
         <StatCard label="Daily Start" icon={Clock} value={route.startTime} highlight>
@@ -68,8 +71,11 @@ export default function RoutesSchedulesPage() {
             <div className="ct-card__header">
               <div>
                 <h2>Collection Stops Sequence</h2>
-                <p>Driving order for {truck.id}</p>
+                <p>Driving order for {truck.id}. Depots stay first and last.</p>
               </div>
+              <button type="button" className="ct-btn ct-btn--soft routes-add" onClick={() => setModal({ type: 'add' })}>
+                <MapPinPlus size={15} /> Add Pickup Point
+              </button>
               {!route.coordinatesVerified && (
                 <StatusBadge tone="amber">Demo coordinates</StatusBadge>
               )}
@@ -82,7 +88,7 @@ export default function RoutesSchedulesPage() {
                       <th>#</th>
                       <th>Stop</th>
                       <th>Purok</th>
-                      <th>Bins</th>
+                      <th>Households</th>
                       <th>Today</th>
                       <th className="is-right">Edit</th>
                     </tr>
@@ -98,18 +104,38 @@ export default function RoutesSchedulesPage() {
                             <small className="ct-mono">{stop.id}</small>
                           </td>
                           <td>{stop.purok}</td>
-                          <td>{isCollectionStop(stop) ? stop.bins : '—'}</td>
+                          <td>{isCollectionStop(stop) ? stop.households : '—'}</td>
                           <td>
                             {st === 'depot' ? (
                               <span className="ct-tag">Depot</span>
                             ) : (
-                              <StatusBadge tone={{ collected: 'green', next: 'amber', pending: 'gray' }[st]}>
-                                {{ collected: 'Collected', next: 'Next stop', pending: 'Pending' }[st]}
-                              </StatusBadge>
+                              <StatusBadge tone={stopStatusMeta[st].tone}>{stopStatusMeta[st].label}</StatusBadge>
                             )}
                           </td>
                           <td>
                             <div className="ct-table__actions">
+                              {isCollectionStop(stop) && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="ct-icon-btn"
+                                    aria-label={`Move ${stop.name} up`}
+                                    disabled={i <= 1}
+                                    onClick={() => dispatch({ type: 'route/moveStop', payload: { id: stop.id, dir: -1 } })}
+                                  >
+                                    <ArrowUp size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="ct-icon-btn"
+                                    aria-label={`Move ${stop.name} down`}
+                                    disabled={i >= route.stops.length - 2}
+                                    onClick={() => dispatch({ type: 'route/moveStop', payload: { id: stop.id, dir: 1 } })}
+                                  >
+                                    <ArrowDown size={16} />
+                                  </button>
+                                </>
+                              )}
                               <button
                                 type="button"
                                 className="ct-icon-btn"
@@ -118,6 +144,17 @@ export default function RoutesSchedulesPage() {
                               >
                                 <Pencil size={16} />
                               </button>
+                              {isCollectionStop(stop) && (
+                                <button
+                                  type="button"
+                                  className="ct-icon-btn"
+                                  aria-label={`Remove ${stop.name}`}
+                                  disabled={collectionStops.length <= 1}
+                                  onClick={() => setModal({ type: 'remove', stop })}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -198,7 +235,7 @@ export default function RoutesSchedulesPage() {
               <small>Collection Area</small>
               <p>
                 <strong>
-                  {barangay.name}: {puroks.join(', ')}
+                  {puroks.join(', ')}
                 </strong>
               </p>
             </div>
@@ -260,9 +297,11 @@ export default function RoutesSchedulesPage() {
           simRunning={simRunning}
           onClose={close}
           onSave={(patch) => {
-            dispatch({ type: 'route/update', payload: patch })
-            toast('Route saved')
-            close()
+            dispatch({ type: 'route/update', payload: patch }).then((res) => {
+              if (!res.ok) return
+              toast('Route saved')
+              close()
+            })
           }}
         />
       )}
@@ -274,20 +313,56 @@ export default function RoutesSchedulesPage() {
           simRunning={simRunning}
           onClose={close}
           onSave={(patch) => {
-            dispatch({ type: 'route/updateStop', payload: { id: modal.stop.id, patch } })
-            toast(`Stop ${modal.number} saved`)
-            close()
+            dispatch({ type: 'route/updateStop', payload: { id: modal.stop.id, patch } }).then((res) => {
+              if (!res.ok) return
+              toast(`Stop ${modal.number} saved`)
+              close()
+            })
           }}
         />
+      )}
+      {modal?.type === 'add' && (
+        <AddStopModal
+          route={route}
+          puroks={barangay.puroks}
+          onClose={close}
+          onSave={(stop) => {
+            dispatch({ type: 'route/addStop', payload: stop }).then((res) => {
+              if (!res.ok) return
+              toast(`${stop.name} added to the route`)
+              close()
+            })
+          }}
+        />
+      )}
+      {modal?.type === 'remove' && (
+        <ConfirmModal
+          title="Remove Pickup Point"
+          confirmLabel="Remove"
+          onClose={close}
+          onConfirm={() => {
+            dispatch({ type: 'route/removeStop', payload: { id: modal.stop.id } }).then((res) => {
+              if (!res.ok) return
+              toast(`${modal.stop.name} removed`)
+            })
+          }}
+        >
+          <p>
+            Remove <strong>{modal.stop.name}</strong> from the route? Past collection records keep their copy of this stop.
+          </p>
+          {simRunning && <div className="ct-alert ct-alert--warning">This restarts the running demo truck from the depot.</div>}
+        </ConfirmModal>
       )}
       {modal?.type === 'day' && (
         <EditScheduleModal
           entry={modal.entry}
           onClose={close}
           onSave={(patch) => {
-            dispatch({ type: 'schedule/update', payload: { day: modal.entry.day, patch } })
-            toast(`${modal.entry.day} schedule saved`)
-            close()
+            dispatch({ type: 'schedule/update', payload: { day: modal.entry.day, patch } }).then((res) => {
+              if (!res.ok) return
+              toast(`${modal.entry.day} schedule saved`)
+              close()
+            })
           }}
         />
       )}

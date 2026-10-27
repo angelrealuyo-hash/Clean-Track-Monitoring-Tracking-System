@@ -1,4 +1,4 @@
-// Shrinks a photo so it fits in browser storage (localStorage holds ~5 MB).
+// Shrinks a photo before upload so reports stay small (the server accepts up to ~500 KB).
 // Returns a JPEG data URL no wider/taller than maxSize pixels.
 export function resizeImage(file, maxSize = 640, quality = 0.7) {
   return new Promise((resolve, reject) => {

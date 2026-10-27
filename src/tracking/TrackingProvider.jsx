@@ -1,59 +1,52 @@
-// Owns the ONE simulated truck for the whole app, so the Dashboard map and the
-// Live Tracking map show the same truck, and switching pages never starts a
-// second timer. The engine itself lives in services/trackingSimulation.js.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+// Gives every screen the ONE simulated truck. The position is calculated from
+// the saved controls + records + the clock (services/trackingSimulation.js), so
+// all tabs agree and a reload keeps the truck in place. One interval per tab
+// refreshes the clock while the truck is running; it is cleared when the truck
+// stops or the app unmounts, so timers never pile up.
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TrackingContext } from './trackingContext.js'
-import { route as defaultRoute } from '../data/routes.js'
-import {
-  createTrackingSimulation,
-  getInitialState,
-  getRouteProgress,
-  validateRoute,
-} from '../services/trackingSimulation.js'
+import { computeSimulation, getRouteProgress, IDLE_CONTROL, validateRoute } from '../services/trackingSimulation.js'
 
-export default function TrackingProvider({ children, route = defaultRoute, tickMs = 1000 }) {
-  const engineRef = useRef(null)
-  const [state, setState] = useState(() => getInitialState(route))
+const NO_RESULTS = {}
+
+export default function TrackingProvider({ children, route, control = IDLE_CONTROL, results = NO_RESULTS, tickMs = 1000, onControl }) {
   const error = validateRoute(route)
-
-  // A new route or speed means a fresh simulation from the first stop
-  // (the effect below builds a new engine; this resets what screens show).
-  const [inputs, setInputs] = useState({ route, tickMs })
-  if (inputs.route !== route || inputs.tickMs !== tickMs) {
-    setInputs({ route, tickMs })
-    setState(getInitialState(route))
-  }
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  const running = control?.status === 'running'
 
   useEffect(() => {
-    if (error) return undefined
-    const engine = createTrackingSimulation({ route, tickMs, onChange: setState })
-    engineRef.current = engine
-    // Cleanup stops the timer when the app unmounts (and in React's dev
-    // double-mount check), so timers never pile up.
-    return () => {
-      engine.dispose()
-      engineRef.current = null
-    }
-  }, [route, tickMs, error])
+    if (!running) return undefined
+    const id = setInterval(() => setNowMs(Date.now()), tickMs)
+    return () => clearInterval(id)
+  }, [running, tickMs])
 
-  const start = useCallback(() => engineRef.current?.start(), [])
-  const pause = useCallback(() => engineRef.current?.pause(), [])
-  const resume = useCallback(() => engineRef.current?.resume(), [])
-  const stop = useCallback(() => engineRef.current?.stop(), [])
+  const state = useMemo(
+    () => (error ? computeSimulation({ route: { stops: route?.stops ?? [] } }) : computeSimulation({ route, control, results, nowMs, tickMs })),
+    [error, route, control, results, nowMs, tickMs],
+  )
+
+  // Controls are saved actions, so every tab sees them.
+  const finished = state.status === 'completed'
+  const start = useCallback(() => onControl?.('sim/start', { force: finished }), [onControl, finished])
+  const pause = useCallback(() => onControl?.('sim/pause'), [onControl])
+  const resume = useCallback(() => onControl?.('sim/resume'), [onControl])
+  const stop = useCallback(() => onControl?.('sim/stop'), [onControl])
+  const reset = useCallback(() => onControl?.('sim/reset'), [onControl])
 
   const value = useMemo(
     () => ({
       route,
       state,
-      progress: error ? null : getRouteProgress(route, state),
+      progress: error ? null : getRouteProgress(route, state, results),
       error,
       tickMs,
       start,
       pause,
       resume,
       stop,
+      reset,
     }),
-    [route, state, error, tickMs, start, pause, resume, stop],
+    [route, state, results, error, tickMs, start, pause, resume, stop, reset],
   )
 
   return <TrackingContext.Provider value={value}>{children}</TrackingContext.Provider>

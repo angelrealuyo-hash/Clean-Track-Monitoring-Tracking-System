@@ -143,3 +143,12 @@
     padding-inline: 16px;
   }
 }
+
+.settings-group-title {
+  margin: 8px 2px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ct-text-muted);
+}

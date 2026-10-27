@@ -30,8 +30,8 @@ export default function NotificationsPage() {
     <div className="m-page">
       <div className="m-row m-row--between">
         <div>
-          <h1 className="m-h1">Notifications &amp; Alerts</h1>
-          <p className="m-muted">{data.settings.barangayName} updates</p>
+          <h1 className="m-h1">Messages</h1>
+          <p className="m-muted">News from {data.settings.barangayName || 'the barangay'}</p>
         </div>
         <button
           type="button"
@@ -48,7 +48,7 @@ export default function NotificationsPage() {
           <Truck size={16} />
         </span>
         <div className="m-grow">
-          <p className="m-eyebrow">Truck Status (simulated)</p>
+          <p className="m-eyebrow">Truck right now (demo)</p>
           <strong>
             {data.truck.id} · {data.route.shortName}
           </strong>
@@ -60,8 +60,8 @@ export default function NotificationsPage() {
         {[
           ['all', `All (${mine.length})`],
           ['unread', `Unread (${unread.length})`],
-          ['report', 'Report Updates'],
-          ['advisory', 'Barangay Advisories'],
+          ['report', 'My reports'],
+          ['advisory', 'Announcements'],
         ].map(([key, text]) => (
           <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}>
             {text}
@@ -72,7 +72,7 @@ export default function NotificationsPage() {
       {shown.length === 0 ? (
         <div className="m-card ct-empty">
           <Bell size={22} />
-          <p>{filter === 'unread' ? 'You are all caught up.' : 'No notifications here yet.'}</p>
+          <p>{filter === 'unread' ? 'No new messages.' : 'No messages yet.'}</p>
         </div>
       ) : (
         shown.map((n) => {
@@ -90,7 +90,7 @@ export default function NotificationsPage() {
                 <div className="m-grow">
                   <div className="m-row m-row--between">
                     <span className="ct-tag">
-                      {n.read ? 'Read' : 'Unread'} · {kindOf(n) === 'report' ? 'Report update' : n.zone ?? 'Advisory'}
+                      {n.read ? 'Read' : 'New'} · {kindOf(n) === 'report' ? 'About your report' : n.zone === 'All Puroks' ? 'For everyone' : n.zone ?? 'Announcement'}
                     </span>
                     <span className="m-muted">
                       <Clock size={11} /> {formatDateTime(n.time)}

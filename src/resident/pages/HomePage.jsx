@@ -18,14 +18,15 @@ import StatusBadge from '../../components/StatusBadge.jsx'
 import { useTruckForResident } from '../components/useTruckForResident.js'
 import { notificationsForResident } from '../../store/selectors.js'
 import { formatDateTime } from '../../utils/format.js'
+import { plainWaste } from '../../data/plainWords.js'
 import './ResidentPages.css'
 
 // Short collection tip per waste type.
 const tips = {
-  'Biodegradable (Kitchen & Yard Waste)': 'Place segregated green bins outside your gate before the truck arrives.',
-  'Recyclables (Plastics, Cartons, Metals)': 'Make sure recyclables are clean, dry and flattened.',
-  'Residual Non-Recyclable Waste': 'Bag residual waste securely; no biodegradables mixed in.',
-  'Hazardous & Electronic Waste (Drop-off)': 'Bring batteries and e-waste to the Barangay drop-off point.',
+  'Biodegradable (Kitchen & Yard Waste)': 'Put your tied bags of food and garden waste outside your gate before the truck comes.',
+  'Recyclables (Plastics, Cartons, Metals)': 'Rinse and flatten bottles, boxes and cans. Put them in a separate bag.',
+  'Residual Non-Recyclable Waste': 'Tie your trash bag well. Do not mix in food scraps.',
+  'Hazardous & Electronic Waste (Drop-off)': 'Bring old batteries and phones to the Barangay drop-off point.',
 }
 
 // PDF page 36
@@ -54,26 +55,26 @@ export default function HomePage() {
         <div className="m-row m-row--between">
           <StatusBadge tone={t.tone}>{t.label}</StatusBadge>
           <span className="m-muted">
-            <Clock size={11} /> Simulated
+            <Clock size={11} /> Demo
           </span>
         </div>
         {t.collectionToday ? (
           <>
-            <p className="m-eyebrow res-gap">Today&apos;s Collection</p>
-            <h2 className="m-h2 res-waste">{t.todaysRun.wasteType}</h2>
+            <p className="m-eyebrow res-gap">Today&apos;s pickup</p>
+            <h2 className="m-h2 res-waste">{plainWaste(t.todaysRun.wasteType)}</h2>
             <dl className="m-kv res-gap">
               <dt>
-                <Clock size={13} /> Scheduled Window
+                <Clock size={13} /> Pickup time
               </dt>
               <dd>{t.todaysRun.window}</dd>
               <dt>
-                <Truck size={13} /> Assigned Truck
+                <Truck size={13} /> Truck
               </dt>
               <dd>
                 {truck.id} {driver && <span className="m-muted">({driver.name})</span>}
               </dd>
               <dt>
-                <RouteIcon size={13} /> Route
+                <RouteIcon size={13} /> Area
               </dt>
               <dd>{route.shortName}</dd>
             </dl>
@@ -86,7 +87,7 @@ export default function HomePage() {
           </>
         ) : (
           <p className="res-gap">
-            No collection today ({t.today}). <Link to="/resident/schedule">See the weekly schedule</Link>.
+            No pickup today ({t.today}). <Link to="/resident/schedule">See the pickup days</Link>.
           </p>
         )}
       </section>
@@ -94,51 +95,51 @@ export default function HomePage() {
       <section className="m-card m-card--flush" aria-label="Truck location">
         <div className="m-row m-row--between res-card-head">
           <strong>
-            <Navigation size={14} /> Truck Live Radar
+            <Navigation size={14} /> Where is the truck?
           </strong>
-          <StatusBadge tone="amber">Simulated GPS</StatusBadge>
+          <StatusBadge tone="amber">Demo location</StatusBadge>
         </div>
         {t.error ? (
           <p className="ct-empty">{t.error}</p>
         ) : (
-          <ErrorBoundary fallback={<p className="ct-empty">Map unavailable.</p>}>
+          <ErrorBoundary fallback={<p className="ct-empty">The map could not load.</p>}>
             <TrackingMap className="m-map" route={route} state={state} progress={progress} truckLabel={truck.id} />
           </ErrorBoundary>
         )}
         <Link to="/resident/track" className="res-card-link">
-          View Live Map <ArrowRight size={14} />
+          See the truck on the map <ArrowRight size={14} />
         </Link>
       </section>
 
-      <h2 className="m-section-title">Quick Actions</h2>
+      <h2 className="m-section-title">What do you want to do?</h2>
       <div className="m-actions">
         <Link to="/resident/track" className="m-action">
           <span className="m-icon">
             <Crosshair size={16} />
           </span>
-          <strong>Track Truck</strong>
-          <small>Simulated live location</small>
+          <strong>See the Truck</strong>
+          <small>Where it is now</small>
         </Link>
         <Link to="/resident/reports/new" className="m-action">
           <span className="m-icon m-icon--red">
             <TriangleAlert size={16} />
           </span>
-          <strong>Report a Problem</strong>
-          <small>Missed pickup or overflow</small>
+          <strong>Report Missed Collection</strong>
+          <small>Garbage bags not picked up</small>
         </Link>
         <Link to="/resident/schedule" className="m-action">
           <span className="m-icon">
             <CalendarDays size={16} />
           </span>
-          <strong>View Schedule</strong>
-          <small>Weekly timetable</small>
+          <strong>Pickup Days</strong>
+          <small>When to put out trash</small>
         </Link>
         <Link to="/resident/profile#hotlines" className="m-action">
           <span className="m-icon">
             <Phone size={16} />
           </span>
-          <strong>Barangay Hotlines</strong>
-          <small>Waste office &amp; emergency</small>
+          <strong>Call for Help</strong>
+          <small>Barangay &amp; emergency</small>
         </Link>
       </div>
 
@@ -149,13 +150,13 @@ export default function HomePage() {
           </span>
           <div className="m-grow">
             <div className="m-row m-row--between">
-              <p className="m-eyebrow">Barangay Advisory</p>
+              <p className="m-eyebrow">Barangay announcement</p>
               <span className="m-muted">{formatDateTime(advisory.time)}</span>
             </div>
             <strong>{advisory.title}</strong>
             <p className="m-muted">{advisory.body}</p>
             <Link to="/resident/notifications" className="res-inline-link">
-              All notifications →
+              See all messages →
             </Link>
           </div>
         </section>

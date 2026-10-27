@@ -3,14 +3,22 @@ import { ArrowLeft, Clock, FileText, History, MapPin, Phone, ShieldCheck, User }
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useResident } from '../../auth/useAccount.js'
-import { reportCategories } from '../../data/reports.js'
 import { barangay } from '../../data/barangay.js'
 import { formatDateTime } from '../../utils/format.js'
+import { plainProblemLabel, plainReportStatus } from '../../data/plainWords.js'
 import './ResidentPages.css'
 
-const categoryLabel = Object.fromEntries(reportCategories.map((c) => [c.id, c.label]))
 const order = ['submitted', 'in-progress', 'resolved']
-const residentStatus = { submitted: ['amber', 'Under review'], 'in-progress': ['blue', 'In progress'], resolved: ['green', 'Resolved'] }
+const residentStatus = plainReportStatus
+
+// The history is written in office words; show it in plain words.
+function plainHistory(text) {
+  if (text === 'Report submitted by resident') return 'You sent this report'
+  if (text === 'Barangay response updated') return 'The Barangay replied'
+  const m = /^Status changed to (.+)$/.exec(text)
+  if (m) return { Reviewing: 'Reviewing: the Barangay is checking it', Resolved: 'Resolved', Submitted: 'Back to Submitted' }[m[1]] ?? text
+  return text
+}
 
 // PDF page 39 (Ticket dossier)
 export default function ReportDetailPage() {
@@ -42,18 +50,18 @@ export default function ReportDetailPage() {
           <ArrowLeft size={18} />
         </Link>
         <div className="m-grow">
-          <p>Ticket Dossier</p>
-          <h1>Report #{report.id}</h1>
+          <p>My report</p>
+          <h1>{plainProblemLabel(report.category)}</h1>
         </div>
       </header>
 
       <section className="m-card m-card--accent">
         <StatusBadge tone={tone}>{label}</StatusBadge>
         <p className="m-muted res-gap">
-          <Clock size={11} /> Submitted {formatDateTime(report.submittedAt)}
+          <Clock size={11} /> Sent {formatDateTime(report.submittedAt)} · Report no. {report.id}
         </p>
         <ol className="m-steps" aria-label="Progress">
-          {['Logged', 'In progress', 'Resolved'].map((s, i) => (
+          {['Submitted', 'Reviewing', 'Resolved'].map((s, i) => (
             <li key={s} className={i <= step ? 'is-done' : ''}>
               <span />
               {s}
@@ -64,59 +72,59 @@ export default function ReportDetailPage() {
 
       <section className="m-card">
         <h2 className="m-section-title">
-          <FileText size={14} /> Ticket Information
+          <FileText size={14} /> Details
         </h2>
         <div className="res-gap" style={{ display: 'grid', gap: 8 }}>
           <div className="m-box">
-            <small>Category</small>
-            <strong>{categoryLabel[report.category]}</strong>
+            <small>Problem</small>
+            <strong>{plainProblemLabel(report.category)}</strong>
           </div>
           <div className="m-box">
-            <small>Location</small>
+            <small>Where</small>
             <strong>
               <MapPin size={12} /> {report.location}
             </strong>
           </div>
           <div className="m-box">
-            <small>Resident Reporter</small>
+            <small>Sent by</small>
             <strong>
               <User size={12} /> {report.residentName}
             </strong>
           </div>
           <div className="m-box">
-            <small>Contact</small>
-            <strong>{report.residentPhone ?? '—'}</strong> {report.smsUpdates && <span className="ct-tag">Updates on</span>}
+            <small>Phone</small>
+            <strong>{report.residentPhone ?? '—'}</strong> {report.smsUpdates && <span className="ct-tag">Updates in Messages</span>}
           </div>
         </div>
       </section>
 
       <section className="m-card">
-        <h2 className="m-section-title">Description &amp; Evidence</h2>
+        <h2 className="m-section-title">What you told us</h2>
         <p className="res-report-desc">“{report.description}”</p>
-        {report.photo ? <img className="res-photo-full" src={report.photo} alt="Photo attached to this report" /> : <p className="m-muted">No photo attached.</p>}
+        {report.photo ? <img className="res-photo-full" src={report.photo} alt="Your photo" /> : <p className="m-muted">No photo.</p>}
       </section>
 
       <section className="m-card res-response">
         <h2 className="m-section-title">
-          <ShieldCheck size={14} /> Barangay Response
+          <ShieldCheck size={14} /> Barangay reply
         </h2>
         {report.adminResponse ? (
           <p className="res-gap">{report.adminResponse}</p>
         ) : (
-          <p className="m-muted res-gap">The barangay office has not replied yet. You will get a notification when they do.</p>
+          <p className="m-muted res-gap">No reply yet. We will let you know when the Barangay answers.</p>
         )}
       </section>
 
       <section className="m-card">
         <h2 className="m-section-title">
-          <History size={14} /> Activity
+          <History size={14} /> What happened so far
         </h2>
         <ol className="ct-timeline res-gap">
           {report.history.map((h, i) => (
             <li key={i} className="is-collected">
               <span className="ct-timeline__dot" />
               <div>
-                <strong>{h.text}</strong>
+                <strong>{plainHistory(h.text)}</strong>
                 <small>{formatDateTime(h.at)}</small>
               </div>
             </li>
@@ -129,7 +137,7 @@ export default function ReportDetailPage() {
           <Phone size={16} />
         </span>
         <div className="m-grow">
-          <strong>Barangay Solid Waste Desk</strong>
+          <strong>Call the Barangay office</strong>
           <p className="m-muted">{barangay.hotline}</p>
         </div>
         <a className="ct-btn ct-btn--soft" href={`tel:${barangay.hotline.replace(/[^\d+]/g, '')}`}>

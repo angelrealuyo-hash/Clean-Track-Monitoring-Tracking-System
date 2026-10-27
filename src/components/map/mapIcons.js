@@ -23,6 +23,7 @@ export function truckIcon(status) {
 export const stopStyles = {
   collected: { color: '#ffffff', weight: 2, fillColor: '#064e32', fillOpacity: 1, radius: 7 },
   next: { color: '#ffffff', weight: 2, fillColor: '#e8920c', fillOpacity: 1, radius: 9 },
+  missed: { color: '#ffffff', weight: 2, fillColor: '#c4231f', fillOpacity: 1, radius: 7 },
   pending: { color: '#17704a', weight: 2.5, fillColor: '#ffffff', fillOpacity: 1, radius: 7 },
   depot: { color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 1, radius: 8 },
 }
@@ -30,6 +31,7 @@ export const stopStyles = {
 export const stopStatusLabels = {
   collected: 'Collected',
   next: 'Next stop',
+  missed: 'Missed',
   pending: 'Pending',
   depot: 'Depot',
 }

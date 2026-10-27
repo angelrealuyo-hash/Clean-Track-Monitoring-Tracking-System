@@ -5,9 +5,7 @@ import MobileFrame from '../../components/MobileFrame.jsx'
 import Logo from '../../components/Logo.jsx'
 import Field from '../../components/Field.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
-import { useData } from '../../store/dataContext.js'
 import { useAuth } from '../../auth/authContext.js'
-import { nextId } from '../../store/dataReducer.js'
 import { barangay } from '../../data/barangay.js'
 import { isEmail, normalizePhone, passwordStrength } from '../../utils/validate.js'
 import '../../styles/mobile-auth.css'
@@ -17,8 +15,8 @@ const strengthText = ['Too weak', 'Weak', 'Fair', 'Strong']
 
 // PDF page 35
 export default function CreateAccountPage() {
-  const { data, dispatch } = useData()
-  const { loginAs } = useAuth()
+  const { register } = useAuth()
+  const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
   const [form, setForm] = useState({
     name: '',
@@ -27,49 +25,40 @@ export default function CreateAccountPage() {
     street: '',
     purok: barangay.puroks[0],
     password: '',
-    confirm: '',
-    agree: false,
   })
   const [show, setShow] = useState(false)
   const [errors, setErrors] = useState({})
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
   const strength = passwordStrength(form.password)
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
+    if (busy) return
     const errs = {}
     if (form.name.trim().split(/\s+/).length < 2) errs.name = 'Enter your first and last name.'
-    if (!isEmail(form.email)) errs.email = 'Enter a valid email address.'
-    else if (data.residents.some((r) => r.email.toLowerCase() === form.email.trim().toLowerCase())) {
-      errs.email = 'An account with this email already exists. Sign in instead.'
-    }
-    const phone = normalizePhone(form.phone)
-    if (!phone) errs.phone = 'Enter a PH mobile number, e.g. 917 555 0192.'
-    if (form.street.trim().length < 5) errs.street = 'Enter your house number and street.'
-    if (form.password.length < 8 || strength < 2) errs.password = 'Use at least 8 characters with letters and numbers.'
-    if (form.confirm !== form.password) errs.confirm = 'Passwords do not match.'
-    if (!form.agree) errs.agree = 'Please agree to the guidelines to continue.'
+    // Email is optional; the mobile number is enough to sign in.
+    const email = form.email.trim().toLowerCase()
+    if (email && !isEmail(email)) errs.email = 'Check the email, or leave it empty.'
+    if (!normalizePhone(form.phone)) errs.phone = 'Enter a PH mobile number, e.g. 917 555 0192.'
+    if (form.street.trim().length < 3) errs.street = 'Enter your house number and street.'
+    if (form.password.length < 6) errs.password = 'Use at least 6 characters.'
     setErrors(errs)
     if (Object.keys(errs).length) {
       document.querySelector('[aria-invalid="true"]')?.focus()
       return
     }
-    const id = nextId('RES', data.residents, 3)
-    dispatch({
-      type: 'resident/add',
-      payload: {
-        id,
-        name: form.name.trim().replace(/\s+/g, ' '),
-        email: form.email.trim().toLowerCase(),
-        phone,
-        address: `${form.street.trim()}, ${form.purok}`,
-        purok: form.purok,
-        password: form.password,
-      },
-    })
-    loginAs('resident', id)
+    // The server checks again (including duplicate numbers/emails) and signs you in.
+    setBusy(true)
+    const res = await register({ name: form.name, phone: form.phone, email, street: form.street, purok: form.purok, password: form.password })
+    setBusy(false)
+    if (!res.ok) {
+      const field = /number/i.test(res.error) ? 'phone' : /email/i.test(res.error) ? 'email' : 'form'
+      setErrors({ [field]: res.error })
+      return
+    }
     navigate('/resident', { replace: true })
   }
+
 
   return (
     <MobileFrame>
@@ -80,46 +69,40 @@ export default function CreateAccountPage() {
           </Link>
           <Logo variant="resident" size={28} />
           <strong>CleanTrack</strong>
-          <StatusBadge tone="green">{barangay.name}</StatusBadge>
+          <StatusBadge tone="green">Resident</StatusBadge>
         </div>
 
         <span className="m-auth__pill">
           <StatusBadge tone="green">
-            <ShieldCheck size={12} /> Household Registry
+            <ShieldCheck size={12} /> New account
           </StatusBadge>
         </span>
         <h1 className="m-h1">Create Account</h1>
         <p className="m-muted signup-intro">
-          Register to receive truck alerts and report collection concerns for your household.
+          Only 5 quick details. Your mobile number is your sign-in.
         </p>
 
         <form onSubmit={submit} noValidate>
-          <Field label="Full Name" htmlFor="su-name" required error={errors.name}>
+          <Field label="Full name" htmlFor="su-name" required error={errors.name}>
             <div className="ct-input-group">
               <User size={16} />
               <input id="su-name" autoComplete="name" placeholder="Maria Clara Santos" value={form.name} onChange={set('name')} aria-invalid={!!errors.name} />
             </div>
           </Field>
-          <Field label="Email Address" htmlFor="su-email" required error={errors.email}>
-            <div className="ct-input-group">
-              <Mail size={16} />
-              <input id="su-email" type="email" autoComplete="email" placeholder="you@email.com" value={form.email} onChange={set('email')} aria-invalid={!!errors.email} />
-            </div>
-          </Field>
-          <Field label="Contact Number" htmlFor="su-phone" required error={errors.phone}>
+          <Field label="Mobile number" htmlFor="su-phone" required error={errors.phone}>
             <div className="ct-input-group">
               <span className="signup-prefix">PH +63</span>
               <Phone size={16} />
               <input id="su-phone" type="tel" autoComplete="tel-national" placeholder="917 555 0192" value={form.phone} onChange={set('phone')} aria-invalid={!!errors.phone} />
             </div>
           </Field>
-          <Field label="House Number / Street / Sitio" htmlFor="su-street" required error={errors.street}>
+          <Field label="House number and street" htmlFor="su-street" required error={errors.street}>
             <div className="ct-input-group">
               <House size={16} />
-              <input id="su-street" autoComplete="street-address" placeholder="Block 4 Lot 12, Narra Street" value={form.street} onChange={set('street')} aria-invalid={!!errors.street} />
+              <input id="su-street" autoComplete="street-address" placeholder="e.g. Lot 5, your street" value={form.street} onChange={set('street')} aria-invalid={!!errors.street} />
             </div>
           </Field>
-          <Field label="Purok" htmlFor="su-purok" hint="Used for truck alerts and purok advisories.">
+          <Field label="Area (Purok)" htmlFor="su-purok" hint="We use this to tell you when the truck is near.">
             <div className="ct-input-group">
               <MapPin size={16} />
               <select id="su-purok" className="signup-select" value={form.purok} onChange={set('purok')}>
@@ -129,7 +112,7 @@ export default function CreateAccountPage() {
               </select>
             </div>
           </Field>
-          <Field label="Create Password" htmlFor="su-pw" required error={errors.password}>
+          <Field label="Password" htmlFor="su-pw" required error={errors.password} hint="At least 6 characters.">
             <div className="ct-input-group">
               <Lock size={16} />
               <input id="su-pw" type={show ? 'text' : 'password'} autoComplete="new-password" value={form.password} onChange={set('password')} aria-invalid={!!errors.password} />
@@ -146,30 +129,27 @@ export default function CreateAccountPage() {
               </div>
             )}
           </Field>
-          <Field label="Confirm Password" htmlFor="su-confirm" required error={errors.confirm}>
+          <Field label="Email (optional)" htmlFor="su-email" error={errors.email}>
             <div className="ct-input-group">
-              <Lock size={16} />
-              <input id="su-confirm" type={show ? 'text' : 'password'} autoComplete="new-password" value={form.confirm} onChange={set('confirm')} aria-invalid={!!errors.confirm} />
+              <Mail size={16} />
+              <input id="su-email" type="email" autoComplete="email" placeholder="you@email.com" value={form.email} onChange={set('email')} aria-invalid={!!errors.email} />
             </div>
           </Field>
-          <label className="ct-checkbox signup-agree">
-            <input type="checkbox" checked={form.agree} onChange={set('agree')} aria-invalid={!!errors.agree} />
-            <span>
-              I agree to the <strong>Barangay Solid Waste Management guidelines</strong> and to receive collection
-              notifications.
-            </span>
-          </label>
-          {errors.agree && <span className="ct-field__error">{errors.agree}</span>}
 
-          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block signup-submit">
-            <UserPlus size={16} /> Create Resident Account
+          {errors.form && (
+            <div className="ct-alert ct-alert--error" role="alert">
+              {errors.form}
+            </div>
+          )}
+          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block signup-submit" disabled={busy}>
+            <UserPlus size={16} /> Create Account
           </button>
         </form>
 
         <p className="m-auth__switch">
           Already registered? <Link to="/resident/login">Sign In ›</Link>
         </p>
-        <footer className="m-auth__footer">Demo app: your account is saved in this browser only.</footer>
+        <footer className="m-auth__footer">Your details are only used by the barangay for garbage collection.</footer>
       </div>
     </MobileFrame>
   )

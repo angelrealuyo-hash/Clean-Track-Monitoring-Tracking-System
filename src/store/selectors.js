@@ -1,24 +1,39 @@
 // Read-only helpers that combine store data with the simulation.
 import { isCollectionStop } from '../services/trackingSimulation.js'
 
-// A stop's status for today. A result the admin set by hand (Collection
-// Monitoring) wins over the simulation.
-// 'collected' | 'missed' | 'next' | 'pending' | 'depot'
-export function getStopStatus(stop, progress, collectionLog) {
-  const manual = collectionLog[stop.id]
-  if (manual) return manual.status
+export { currentRun } from './dataReducer.js'
+
+// A stop's status: collected/missed from the saved records, "next" from the
+// simulated truck. (progress = getRouteProgress(route, sim, results))
+export function getStopStatus(stop, progress) {
   return progress ? progress.statusOf(stop) : 'pending'
 }
 
-export function getCollectionSummary(route, progress, collectionLog) {
+export function getCollectionSummary(route, progress) {
   const stops = route.stops.filter(isCollectionStop)
   const counts = { collected: 0, missed: 0, next: 0, pending: 0 }
-  for (const stop of stops) counts[getStopStatus(stop, progress, collectionLog)] += 1
+  for (const stop of stops) counts[getStopStatus(stop, progress)] += 1
   const total = stops.length
   return {
     total,
     ...counts,
     percent: total ? Math.round((counts.collected / total) * 100) : 0,
+  }
+}
+
+// Summary of one saved run (history / analytics).
+export function summarizeRun(run) {
+  const results = Object.values(run.results)
+  const total = run.stops.length
+  const collected = results.filter((r) => r.status === 'collected').length
+  const missed = results.filter((r) => r.status === 'missed').length
+  return {
+    total,
+    collected,
+    missed,
+    notDone: total - collected - missed,
+    percent: total ? Math.round((collected / total) * 100) : 0,
+    households: run.stops.filter((s) => run.results[s.id]?.status === 'collected').reduce((n, s) => n + s.households, 0),
   }
 }
 
@@ -31,8 +46,8 @@ export const stopStatusMeta = {
 }
 
 export const reportStatusMeta = {
-  submitted: { tone: 'red', label: 'New' },
-  'in-progress': { tone: 'amber', label: 'In progress' },
+  submitted: { tone: 'red', label: 'Submitted' },
+  'in-progress': { tone: 'amber', label: 'Reviewing' },
   resolved: { tone: 'green', label: 'Resolved' },
 }
 
@@ -61,6 +76,9 @@ export function notificationsForResident(notifications, resident) {
   if (!resident) return []
   return notifications.filter((n) => {
     if (n.audience !== 'resident') return false
+    // Automatic messages the resident turned off in Profile.
+    if (n.kind === 'proximity' && resident.prefs?.truckNearby === false) return false
+    if (n.kind === 'schedule' && resident.prefs?.scheduleReminders === false) return false
     if (n.residentId) return n.residentId === resident.id
     if (n.zone) return n.zone === 'All Puroks' || n.zone === resident.purok
     return true

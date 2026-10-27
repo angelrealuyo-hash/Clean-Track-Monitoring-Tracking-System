@@ -25,7 +25,7 @@ export default function NotificationsPage() {
         <div className="m-grow">
           <strong>{driver.name}</strong>
           <p className="m-muted">
-            Unit {data.truck.id} · {data.route.shortName}
+            Truck {data.truck.id} · {data.route.shortName}
           </p>
         </div>
         <button
@@ -34,13 +34,13 @@ export default function NotificationsPage() {
           disabled={unread.length === 0}
           onClick={() => dispatch({ type: 'notification/markAllRead', payload: { audience: 'driver' } })}
         >
-          <CheckCheck size={15} /> Mark All Read
+          <CheckCheck size={15} /> Mark all as read
         </button>
       </section>
 
       <div className="m-row m-row--between">
-        <h1 className="m-h1">Notifications</h1>
-        {unread.length > 0 && <StatusBadge tone="red">{unread.length} unread</StatusBadge>}
+        <h1 className="m-h1">Messages from the Office</h1>
+        {unread.length > 0 && <StatusBadge tone="red">{unread.length} new</StatusBadge>}
       </div>
 
       <div className="m-chips" role="group" aria-label="Filter notifications">
@@ -48,20 +48,20 @@ export default function NotificationsPage() {
           All ({mine.length})
         </button>
         <button type="button" aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')}>
-          Unread ({unread.length})
+          New ({unread.length})
         </button>
       </div>
 
       {shown.length === 0 ? (
         <div className="m-card ct-empty">
           <Bell size={22} />
-          <p>{filter === 'unread' ? 'You are all caught up.' : 'No messages from dispatch yet.'}</p>
+          <p>{filter === 'unread' ? 'No new messages.' : 'No messages yet.'}</p>
         </div>
       ) : (
         shown.map((n) => (
           <article key={n.id} className={`m-card m-notif ${n.read ? '' : 'is-unread'} is-${n.priority}`} onClick={() => markRead(n)}>
             <div className="m-row m-row--between">
-              <StatusBadge tone={n.read ? 'gray' : priorityMeta[n.priority].tone}>{n.read ? 'Read' : priorityMeta[n.priority].label}</StatusBadge>
+              <StatusBadge tone={n.read ? 'gray' : priorityMeta[n.priority].tone}>{n.read ? 'Read' : n.priority === 'high' ? 'Important' : 'New'}</StatusBadge>
               <span className="m-muted">
                 <Clock size={11} /> {formatDateTime(n.time)}
               </span>

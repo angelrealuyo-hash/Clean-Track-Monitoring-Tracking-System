@@ -212,3 +212,12 @@
 .stat-card__detail b.is-red {
   color: var(--ct-red-600);
 }
+
+.dashboard__chart {
+  margin-bottom: 12px;
+}
+
+.dashboard__upcoming {
+  display: block;
+  font-weight: 500;
+}

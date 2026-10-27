@@ -1,14 +1,9 @@
-import { Recycle, Trash2, Truck } from 'lucide-react'
+import logo from '../assets/cleantrack-logo.png'
 import './Logo.css'
 
-const icons = { admin: Trash2, resident: Recycle, driver: Truck }
-
-// Dark green rounded tile with the app's icon, as in the PDF.
-export default function Logo({ variant = 'admin', size = 36 }) {
-  const Icon = icons[variant]
-  return (
-    <span className="ct-logo" style={{ width: size, height: size }}>
-      <Icon size={Math.round(size * 0.55)} strokeWidth={2.2} />
-    </span>
-  )
+// CleanTrack logo (truck with location pin). Used by all three apps.
+// `variant` is kept so older calls still work; every app uses the same logo.
+// eslint-disable-next-line no-unused-vars
+export default function Logo({ variant, size = 36 }) {
+  return <img className="ct-brand-logo" src={logo} alt="CleanTrack logo" width={size} height={size} />
 }

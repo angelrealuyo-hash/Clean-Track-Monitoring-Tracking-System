@@ -9,3 +9,13 @@
   justify-content: space-between;
   font-size: 13px;
 }
+
+.routes-add {
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.ct-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

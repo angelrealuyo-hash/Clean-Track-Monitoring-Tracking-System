@@ -27,7 +27,7 @@ export default function DriverLayout() {
       <div className="mobile-header__title">
         <strong>CleanTrack Driver</strong>
         <span>
-          {data.settings.barangayName} · {data.truck.id}
+          {data.settings.barangayName ? `${data.settings.barangayName} · ` : ''}Truck {data.truck.id}
         </span>
       </div>
       <div className="mobile-header__right">

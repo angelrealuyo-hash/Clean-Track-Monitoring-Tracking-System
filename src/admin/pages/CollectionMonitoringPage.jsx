@@ -19,9 +19,10 @@ import MarkMissedModal from '../components/MarkMissedModal.jsx'
 import ConfirmModal from '../../components/ConfirmModal.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useData } from '../../store/dataContext.js'
+import { useAuth } from '../../auth/authContext.js'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { useToast } from '../../components/toast/toastContext.js'
-import { getCollectionSummary, getStopStatus, stopStatusMeta } from '../../store/selectors.js'
+import { currentRun, getCollectionSummary, getStopStatus, stopStatusMeta } from '../../store/selectors.js'
 import { isCollectionStop, SIMULATION_LABEL } from '../../services/trackingSimulation.js'
 import { downloadCsv } from '../../utils/csv.js'
 import { formatTime, todayISO } from '../../utils/format.js'
@@ -29,20 +30,26 @@ import '../components/AdminPage.css'
 import './CollectionMonitoringPage.css'
 
 // PDF pages 25-26
+const recordedBy = (r) => (r.byName ? `${r.byName} (${r.by})` : r.by)
+
 export default function CollectionMonitoringPage() {
   const { data, dispatch } = useData()
+  const { sessions } = useAuth()
   const { progress } = useTracking()
   const toast = useToast()
-  const { route, truck, drivers, collectionLog } = data
+  const { route, truck, drivers } = data
+  const run = currentRun(data)
+  const results = run?.results ?? {}
+  const adminName = sessions.admin?.name ?? 'Barangay office'
   const driver = drivers.find((d) => d.id === truck.driverId)
 
   const stops = route.stops.filter(isCollectionStop).map((stop) => ({
     stop,
     number: route.stops.indexOf(stop),
-    status: getStopStatus(stop, progress, collectionLog),
-    manual: collectionLog[stop.id] ?? null,
+    status: getStopStatus(stop, progress),
+    manual: results[stop.id] ?? null,
   }))
-  const summary = getCollectionSummary(route, progress, collectionLog)
+  const summary = getCollectionSummary(route, progress)
   const puroks = [...new Set(stops.map((s) => s.stop.purok))]
 
   const [query, setQuery] = useState('')
@@ -63,15 +70,15 @@ export default function CollectionMonitoringPage() {
   function exportLog() {
     downloadCsv(
       `cleantrack-collection-${todayISO()}.csv`,
-      ['Stop #', 'Stop ID', 'Stop', 'Purok', 'Bins', 'Status', 'Source', 'Note', 'Recorded at'],
+      ['Stop #', 'Stop ID', 'Stop', 'Purok', 'Households', 'Status', 'Recorded by', 'Note', 'Recorded at'],
       stops.map((s) => [
         s.number,
         s.stop.id,
         s.stop.name,
         s.stop.purok,
-        s.stop.bins,
+        s.stop.households,
         stopStatusMeta[s.status].label,
-        s.manual ? 'Set by admin' : 'Simulation',
+        s.manual ? recordedBy(s.manual) : '',
         s.manual?.note ?? '',
         s.manual ? new Date(s.manual.at).toLocaleString('en-PH') : '',
       ]),
@@ -80,7 +87,7 @@ export default function CollectionMonitoringPage() {
   }
 
   function mark(stopId, newStatus, note) {
-    dispatch({ type: 'collection/mark', payload: { stopId, status: newStatus, note } })
+    dispatch({ type: 'collection/mark', payload: { stopId, status: newStatus, note, by: 'admin', byName: adminName } })
   }
 
   return (
@@ -88,7 +95,7 @@ export default function CollectionMonitoringPage() {
       <PageHeader
         title="Collection Monitoring"
         badge="Today"
-        subtitle="Check each collection stop on today's route and record results"
+        subtitle="Pickup points on today's route. Results are recorded by the driver (or here by the office)."
         actions={
           <>
             <button type="button" className="ct-btn ct-btn--secondary" onClick={exportLog}>
@@ -98,13 +105,25 @@ export default function CollectionMonitoringPage() {
               type="button"
               className="ct-btn ct-btn--secondary"
               onClick={() => setModal('clearAll')}
-              disabled={Object.keys(collectionLog).length === 0}
+              disabled={Object.keys(results).length === 0}
             >
-              <RotateCcw size={16} /> Clear Manual Results
+              <RotateCcw size={16} /> Clear Results
             </button>
           </>
         }
       />
+
+      <div className="ct-alert" role="status">
+        <ClipboardCheck size={16} />
+        {run ? (
+          <span>
+            Collection run <strong>{run.id}</strong> · started {formatTime(run.startedAt)} by {run.startedBy === 'driver' ? run.driverName : 'the office'}
+            {run.endedAt ? ` · ended ${formatTime(run.endedAt)}` : ' · in progress'}
+          </span>
+        ) : (
+          <span>No collection run yet today. It starts when the driver taps Start Route (or when you record a stop here).</span>
+        )}
+      </div>
 
       <section className="ct-stats" aria-label="Collection summary">
         <StatCard label="Total Stops Today" icon={MapPin} value={summary.total} unit="stops">
@@ -158,7 +177,7 @@ export default function CollectionMonitoringPage() {
                   <tr>
                     <th>Collection Stop</th>
                     <th>Purok</th>
-                    <th>Bins</th>
+                    <th>Households</th>
                     <th>Status</th>
                     <th className="is-right">View</th>
                   </tr>
@@ -177,10 +196,10 @@ export default function CollectionMonitoringPage() {
                         <small className="ct-mono">{s.stop.id}</small>
                       </td>
                       <td>{s.stop.purok}</td>
-                      <td>{s.stop.bins}</td>
+                      <td>{s.stop.households}</td>
                       <td>
                         <StatusBadge tone={stopStatusMeta[s.status].tone}>{stopStatusMeta[s.status].label}</StatusBadge>
-                        {s.manual && <small>Set by admin</small>}
+                        {s.manual && <small>by {recordedBy(s.manual)}</small>}
                       </td>
                       <td>
                         <div className="ct-table__actions">
@@ -239,8 +258,10 @@ export default function CollectionMonitoringPage() {
                   className="ct-btn ct-btn--secondary"
                   disabled={!selected.manual}
                   onClick={() => {
-                    dispatch({ type: 'collection/clear', payload: { stopId: selected.stop.id } })
-                    toast('Manual result cleared')
+                    dispatch({ type: 'collection/clear', payload: { stopId: selected.stop.id } }).then((res) => {
+                      if (!res.ok) return
+                      toast('Result cleared')
+                    })
                   }}
                 >
                   <RotateCcw size={15} /> Clear Result
@@ -262,8 +283,8 @@ export default function CollectionMonitoringPage() {
               <dl className="ct-kv">
                 <dt>Purok</dt>
                 <dd>{selected.stop.purok}</dd>
-                <dt>Bins</dt>
-                <dd>{selected.stop.bins}</dd>
+                <dt>Households</dt>
+                <dd>{selected.stop.households}</dd>
                 <dt>Route order</dt>
                 <dd>
                   Stop {selected.number} of {stops.length}
@@ -274,14 +295,15 @@ export default function CollectionMonitoringPage() {
               {selected.manual ? (
                 <>
                   <p>
-                    <strong>{stopStatusMeta[selected.manual.status].label}</strong> · set by admin at{' '}
+                    <strong>{stopStatusMeta[selected.manual.status].label}</strong> · recorded by {recordedBy(selected.manual)} at{' '}
                     {formatTime(selected.manual.at)}
                   </p>
                   {selected.manual.note && <p className="collection-note">{selected.manual.note}</p>}
                 </>
               ) : (
                 <p>
-                  <ClipboardCheck size={13} /> From the tracking simulation: <strong>{stopStatusMeta[selected.status].label}</strong>
+                  <ClipboardCheck size={13} /> Not recorded yet.{' '}
+                  {selected.status === 'next' ? 'The (simulated) truck is heading here.' : 'Waiting for the driver.'}
                 </p>
               )}
             </DetailSection>
@@ -304,15 +326,17 @@ export default function CollectionMonitoringPage() {
       )}
       {modal === 'clearAll' && (
         <ConfirmModal
-          title="Clear Manual Results"
+          title="Clear Results"
           confirmLabel="Clear All"
           onClose={() => setModal(null)}
           onConfirm={() => {
-            dispatch({ type: 'collection/clearAll' })
-            toast('All manual results cleared')
+            dispatch({ type: 'collection/clearAll' }).then((res) => {
+              if (!res.ok) return
+              toast('All results cleared')
+            })
           }}
         >
-          <p>Remove every Collected/Missed result you set by hand today? Stops will go back to the simulation status.</p>
+          <p>Remove every Collected/Missed record of the current collection run? This also removes results the driver recorded. Use only to correct mistakes.</p>
         </ConfirmModal>
       )}
     </div>

@@ -104,3 +104,4 @@
 .ct-map-legend .is-next { background: var(--ct-amber-500); }
 .ct-map-legend .is-pending { background: #fff; border: 2px solid var(--ct-green-700); }
 .ct-map-legend .is-depot { background: var(--ct-blue-600); }
+.ct-map-legend .is-missed { background: var(--ct-red-600); }

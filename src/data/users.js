@@ -15,9 +15,9 @@ export const demoUsers = {
     name: 'Maria Clara Santos',
     initials: 'MS',
     phone: '+63 917 555 0192',
-    address: 'Block 4 Lot 12, Narra Street, Purok 2',
+    address: 'Demo address, Purok 2',
     purok: 'Purok 2',
-    householdId: 'HH-SANANTONIO-402',
+    householdId: 'HH-RIZAL-402',
   },
   driver: {
     id: 'DRV-01',

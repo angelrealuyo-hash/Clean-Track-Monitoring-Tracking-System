@@ -26,30 +26,34 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [showForgot, setShowForgot] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   // Once signed in, go to the page they originally asked for (or the app's home).
   if (signedIn) return <Navigate to={location.state?.from || '/driver'} replace />
 
-  function signIn(emailValue, passwordValue) {
+  async function signIn(emailValue, passwordValue) {
+    if (busy) return
+    setBusy(true)
+    const res = await login('driver', emailValue, passwordValue, remember)
+    setBusy(false)
     // On success, the redirect at the top of this component takes over.
-    if (!login('driver', emailValue, passwordValue, remember)) {
-      setError('Incorrect email or password. Try the Quick Demo button below.')
-    }
+    if (!res.ok) setError(res.error || 'Wrong email or password.')
   }
+
 
   return (
     <MobileFrame>
       <div className="m-auth">
         <div className="m-auth__top">
-          <StatusBadge tone="green">Student Project Prototype · Simulated Demo</StatusBadge>
+          <StatusBadge tone="green">Demo app</StatusBadge>
         </div>
 
         <div className="m-auth__brand">
-          <Logo variant="driver" size={52} />
+          <Logo variant="driver" size={80} />
           <h1>CleanTrack Driver</h1>
-          <p>{barangay.name} · Driver App</p>
+          <p>For barangay garbage truck drivers</p>
           <StatusBadge tone="gray">
-            <MapPin size={12} /> Solid Waste Management Unit
+            <MapPin size={12} /> Barangay garbage office
           </StatusBadge>
         </div>
 
@@ -61,7 +65,7 @@ export default function LoginPage() {
           }}
         >
           <h2>Driver Sign In</h2>
-          <p>Sign in to start your collection shift.</p>
+          <p>Sign in to start your route.</p>
 
           {error && (
             <div className="ct-alert ct-alert--error" role="alert">
@@ -131,11 +135,11 @@ export default function LoginPage() {
             Remember this device
           </label>
 
-          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block">
+          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block" disabled={busy}>
             Sign In to Shift <ArrowRight size={16} />
           </button>
 
-          <div className="ct-divider-text">OR TRY THE DEMO</div>
+          <div className="ct-divider-text">OR</div>
 
           <button
             type="button"
@@ -144,9 +148,9 @@ export default function LoginPage() {
           >
             <Zap size={18} />
             <span>
-              Quick Demo: Sign in as {demoDriver.name}
+              Try the demo as {demoDriver.name}
               <small>
-                {truck.type} {truck.id} · Morning Route
+                Truck {truck.id} · morning route
               </small>
             </span>
             <ArrowRight size={16} />
@@ -156,13 +160,12 @@ export default function LoginPage() {
         <div className="ct-alert">
           <Info size={16} />
           <span>
-            <strong>Shift Notice:</strong> Truck location in this prototype is simulated. No GPS
-            device is connected.
+            <strong>Demo app:</strong> the truck location on the map is simulated.
           </span>
         </div>
 
         <footer className="m-auth__footer">
-          Need help? Contact the Barangay Office
+          Need help? Call the Barangay office
           <strong>
             <Phone size={12} /> {barangay.hotline}
           </strong>

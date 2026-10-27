@@ -1,14 +1,25 @@
-// SIMULATED TRACKING ENGINE
-// This prototype has no GPS hardware. This module "drives" one truck along the
-// route's stops on a timer so the maps have something to show. It knows nothing
-// about React or Leaflet; screens read its state and draw it.
+// SIMULATED TRACKING ENGINE (demo mode)
+// CleanTrack has no GPS device connected. This module works out where the demo
+// truck is on the route. Every position is tagged source: 'SIMULATED' so it can
+// never be mixed up with real GPS data (see services/locationSource.js). It
+// knows nothing about React or Leaflet; screens read its result and draw it.
 //
-// Status flow:
+// How it works: the position is a PURE FUNCTION of the simulation controls
+// (when it started, pauses), the saved stop records, and the clock. So every
+// browser tab (Admin, Driver, Resident) shows the same truck, a page reload
+// keeps the truck where it was, and every demo behaves the same way.
+//
+// The simulation only MOVES the truck. It never decides that garbage was
+// collected: at each pickup point the truck waits until the driver or office
+// records the stop (collected or missed), then drives on.
+//
+// Control status flow (saved in the data store as `simulation`):
 //   idle --start--> running --pause--> paused --resume--> running
 //   running/paused --stop--> stopped --start--> running (from the beginning)
-//   running --(reaches last stop)--> completed --start--> running
+//   running --(reaches last stop)--> shown as 'completed'
 
-export const SIMULATION_LABEL = 'Simulated GPS · demo data, not a real truck location'
+export const SIMULATION_LABEL = 'SIMULATED GPS — DEMO MODE · not a real truck location'
+export const LOCATION_SOURCE = 'SIMULATED'
 
 export const STATUS_LABELS = {
   idle: 'Not started',
@@ -26,8 +37,8 @@ export const STATUS_TONES = {
   completed: 'blue',
 }
 
-// Depots have no bins; every other stop is a collection stop.
-export const isCollectionStop = (stop) => stop.bins > 0
+// Depots serve no households; every other stop is a pickup point.
+export const isCollectionStop = (stop) => stop.households > 0
 
 function lerp(a, b, t) {
   return a + (b - a) * t
@@ -52,149 +63,147 @@ export function getInitialState(route) {
     step: 0, // progress along the current leg, 0..stepsPerLeg
     position: first ? { lat: first.coords[0], lng: first.coords[1] } : null,
     speedKmh: 0,
-    collectedStopIds: [],
+    waitingAt: null, // id of the pickup point the truck is waiting at
+    startedAt: null,
+    source: LOCATION_SOURCE,
     updatedAt: null,
   }
 }
 
+export const IDLE_CONTROL = { status: 'idle', startedAt: null, pausedAt: null, stoppedAt: null, pausedMs: 0 }
+
+// Simulation time (ms of driving time) at wall-clock time `nowMs`. Paused time
+// does not count; after Stop the clock is frozen at the moment it stopped.
+export function simElapsed(control, nowMs) {
+  if (!control?.startedAt) return 0
+  const start = Date.parse(control.startedAt)
+  const end =
+    control.status === 'paused' ? Date.parse(control.pausedAt) : control.status === 'stopped' ? Date.parse(control.stoppedAt) : nowMs
+  return Math.max(0, end - start - (control.pausedMs || 0))
+}
+
 /**
- * Creates one simulation. Only one movement timer can exist per simulation:
- * every action clears the old timer before starting a new one.
+ * Where the truck is.
  *
- * @param {object}   opts
- * @param {object}   opts.route        route with ordered `stops` ({ id, coords, bins })
- * @param {number}   opts.tickMs       how often the truck moves (ms)
- * @param {number}   opts.stepsPerLeg  how many ticks it takes to drive between two stops
- * @param {Function} opts.onChange     called with the new state after every change
+ * @param {object} opts.route        route with ordered `stops` ({ id, coords, households })
+ * @param {object} opts.control      { status, startedAt, pausedAt, stoppedAt, pausedMs }
+ * @param {object} opts.results      saved records { [stopId]: { status, simAt } }; simAt is
+ *                                   the simulation time when the stop was recorded
+ * @param {number} opts.nowMs        current time (Date.now())
+ * @param {number} opts.tickMs       one movement step (Settings → update interval)
+ * @param {number} opts.stepsPerLeg  steps to drive from one stop to the next
  */
-export function createTrackingSimulation({ route, tickMs = 1000, stepsPerLeg = 6, onChange = () => {} }) {
-  const error = validateRoute(route)
-  if (error) throw new Error(error)
+export function computeSimulation({ route, control = IDLE_CONTROL, results = {}, nowMs = Date.now(), tickMs = 1000, stepsPerLeg = 6 }) {
+  const base = getInitialState(route)
+  if (!control || control.status === 'idle' || !control.startedAt) return base
 
   const stops = route.stops
-  let state = getInitialState(route)
-  let timer = null
-  let disposed = false
-
-  function emit(patch) {
-    state = { ...state, ...patch, updatedAt: new Date().toISOString() }
-    if (!disposed) onChange(state)
-  }
-
-  function clearTimer() {
-    if (timer !== null) {
-      clearInterval(timer)
-      timer = null
-    }
-  }
-
-  function startTimer() {
-    clearTimer()
-    timer = setInterval(tick, tickMs)
-  }
-
-  function tick() {
-    let { legIndex, step, collectedStopIds } = state
-    step += 1
-
-    // Arrived at the next stop.
-    if (step >= stepsPerLeg) {
-      legIndex += 1
-      step = 0
-      const arrived = stops[legIndex]
-      if (isCollectionStop(arrived) && !collectedStopIds.includes(arrived.id)) {
-        collectedStopIds = [...collectedStopIds, arrived.id]
+  const legMs = tickMs * stepsPerLeg
+  const elapsed = simElapsed(control, nowMs)
+  let t = 0 // simulation time when the truck leaves stops[i]
+  for (let i = 0; i < stops.length - 1; i++) {
+    const arrive = t + legMs
+    const next = stops[i + 1]
+    if (elapsed < arrive) {
+      // Driving between stops[i] and stops[i + 1].
+      const f = (elapsed - t) / legMs
+      const step = Math.min(stepsPerLeg - 1, Math.floor(f * stepsPerLeg))
+      return {
+        ...base,
+        status: control.status,
+        legIndex: i,
+        step,
+        position: { lat: lerp(stops[i].coords[0], next.coords[0], f), lng: lerp(stops[i].coords[1], next.coords[1], f) },
+        speedKmh: control.status === 'running' ? 14 + ((i * 3 + step * 5) % 9) : 0,
+        startedAt: control.startedAt,
+        updatedAt: new Date(nowMs).toISOString(),
       }
     }
-
-    const finished = legIndex >= stops.length - 1
-    const from = stops[legIndex]
-    const to = stops[Math.min(legIndex + 1, stops.length - 1)]
-    const t = finished ? 0 : step / stepsPerLeg
-
-    if (finished) clearTimer()
-
-    emit({
-      status: finished ? 'completed' : 'running',
-      legIndex,
-      step,
-      position: { lat: lerp(from.coords[0], to.coords[0], t), lng: lerp(from.coords[1], to.coords[1], t) },
-      // Made-up but plausible barangay speed; 0 while stopped at a stop.
-      speedKmh: finished || step === 0 ? 0 : 14 + ((legIndex * 3 + step * 5) % 9),
-      collectedStopIds,
-    })
+    // Arrived at stops[i + 1]. A pickup point holds the truck until recorded.
+    let leave = arrive
+    if (isCollectionStop(next)) {
+      const rec = results[next.id]
+      if (!rec) {
+        return {
+          ...base,
+          status: control.status,
+          legIndex: i + 1,
+          step: 0,
+          position: { lat: next.coords[0], lng: next.coords[1] },
+          waitingAt: next.id,
+          startedAt: control.startedAt,
+          updatedAt: new Date(nowMs).toISOString(),
+        }
+      }
+      // Recorded before the truck got there (or with no time): no wait.
+      leave = Math.max(arrive, Number.isFinite(rec.simAt) ? rec.simAt : 0)
+      if (elapsed < leave) {
+        return {
+          ...base,
+          status: control.status,
+          legIndex: i + 1,
+          step: 0,
+          position: { lat: next.coords[0], lng: next.coords[1] },
+          startedAt: control.startedAt,
+          updatedAt: new Date(nowMs).toISOString(),
+        }
+      }
+    }
+    t = leave
   }
-
+  // Reached the end depot.
+  const last = stops[stops.length - 1]
   return {
-    getState: () => state,
-
-    // Starts from the first stop. Ignored while already running or paused.
-    start() {
-      if (disposed || state.status === 'running' || state.status === 'paused') return
-      state = getInitialState(route)
-      emit({ status: 'running' })
-      startTimer()
-    },
-
-    pause() {
-      if (disposed || state.status !== 'running') return
-      clearTimer()
-      emit({ status: 'paused', speedKmh: 0 })
-    },
-
-    // Continues from exactly where it was paused.
-    resume() {
-      if (disposed || state.status !== 'paused') return
-      emit({ status: 'running' })
-      startTimer()
-    },
-
-    // Ends the run. The truck stays where it stopped until Start is pressed again.
-    stop() {
-      if (disposed || (state.status !== 'running' && state.status !== 'paused')) return
-      clearTimer()
-      emit({ status: 'stopped', speedKmh: 0 })
-    },
-
-    // Call when the simulation is no longer needed (e.g. component unmounts).
-    dispose() {
-      clearTimer()
-      disposed = true
-    },
-
-    // For tests: true while a movement timer exists.
-    hasActiveTimer: () => timer !== null,
+    ...base,
+    status: control.status === 'stopped' ? 'stopped' : 'completed',
+    legIndex: stops.length - 1,
+    step: 0,
+    position: { lat: last.coords[0], lng: last.coords[1] },
+    startedAt: control.startedAt,
+    updatedAt: new Date(nowMs).toISOString(),
   }
 }
 
 /**
- * Collection progress derived from the simulation state, for cards and lists.
+ * Collection progress for cards, lists and map colours.
+ * Collected/missed come ONLY from the saved records (`results`, written when the
+ * driver or admin records a stop). The simulation only says where the truck is
+ * heading ("next").
+ *
+ * @param {object} results  { [stopId]: { status: 'collected' | 'missed', ... } }
  */
-export function getRouteProgress(route, state) {
-  const collectionStops = route.stops.filter(isCollectionStop)
-  const collected = state.collectedStopIds.length
-  const total = collectionStops.length
+export function getRouteProgress(route, state, results = {}) {
+  const pickupStops = route.stops.filter(isCollectionStop)
+  const recorded = (stop) => results[stop.id]?.status
   const active = state.status === 'running' || state.status === 'paused'
-  const nextStop = active ? route.stops[state.legIndex + 1] ?? null : null
+  const nextStop = state.waitingAt
+    ? route.stops.find((s) => s.id === state.waitingAt) ?? null
+    : active
+      ? route.stops[state.legIndex + 1] ?? null
+      : null
 
-  // 'collected' | 'next' | 'pending' | 'depot'
+  // 'collected' | 'missed' | 'next' | 'pending' | 'depot'
   function statusOf(stop) {
-    if (state.collectedStopIds.includes(stop.id)) return 'collected'
-    if (nextStop && stop.id === nextStop.id) return 'next'
+    const r = recorded(stop)
+    if (r === 'collected' || r === 'missed') return r
     if (!isCollectionStop(stop)) return 'depot'
+    if (nextStop && stop.id === nextStop.id) return 'next'
     return 'pending'
   }
 
+  const collected = pickupStops.filter((s) => recorded(s) === 'collected').length
+  const missed = pickupStops.filter((s) => recorded(s) === 'missed').length
+  const total = pickupStops.length
   return {
     total,
     collected,
-    remaining: total - collected,
+    missed,
+    remaining: total - collected - missed,
     percent: total ? Math.round((collected / total) * 100) : 0,
-    totalBins: collectionStops.reduce((sum, s) => sum + s.bins, 0),
-    collectedBins: collectionStops
-      .filter((s) => state.collectedStopIds.includes(s.id))
-      .reduce((sum, s) => sum + s.bins, 0),
+    totalHouseholds: pickupStops.reduce((sum, s) => sum + s.households, 0),
+    collectedHouseholds: pickupStops.filter((s) => recorded(s) === 'collected').reduce((sum, s) => sum + s.households, 0),
     nextStop,
+    waitingAt: state.waitingAt,
     statusOf,
   }
 }

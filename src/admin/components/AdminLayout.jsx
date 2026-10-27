@@ -108,7 +108,7 @@ export default function AdminLayout() {
           <nav className="admin-breadcrumb" aria-label="Breadcrumb">
             <span>CleanTrack</span>
             <span className="admin-breadcrumb__sep">/</span>
-            <span>{data.settings.barangayName}</span>
+            <span>{data.settings.barangayName || 'Barangay'}</span>
             <span className="admin-breadcrumb__sep">/</span>
             <strong>{current?.label ?? 'Admin'}</strong>
           </nav>

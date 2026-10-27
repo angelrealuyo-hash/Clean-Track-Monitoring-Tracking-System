@@ -1,11 +1,11 @@
-import { Pause, Play, RotateCcw, Square } from 'lucide-react'
+import { Pause, Play, RotateCcw, Square, Undo2 } from 'lucide-react'
 import { useTracking } from '../../tracking/trackingContext.js'
 import './SimulationControls.css'
 
-// Start / Pause / Resume / Stop for the simulated truck.
+// Start / Pause / Resume / Stop / Reset for the simulated truck.
 // Only the buttons that make sense for the current status are shown.
 export default function SimulationControls() {
-  const { state, error, start, pause, resume, stop } = useTracking()
+  const { state, error, start, pause, resume, stop, reset } = useTracking()
   const { status } = state
 
   if (error) return null
@@ -31,6 +31,11 @@ export default function SimulationControls() {
       {(status === 'running' || status === 'paused') && (
         <button type="button" className="ct-btn ct-btn--danger" onClick={stop}>
           <Square size={14} /> Stop
+        </button>
+      )}
+      {status !== 'idle' && (
+        <button type="button" className="ct-btn ct-btn--secondary" onClick={reset} title="Move the demo truck back to the depot">
+          <Undo2 size={15} /> Reset
         </button>
       )}
     </div>

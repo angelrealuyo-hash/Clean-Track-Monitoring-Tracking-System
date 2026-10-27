@@ -15,14 +15,14 @@ export default function NotifyResidentsModal({ onSend, onClose }) {
     const errs = {}
     if (form.subject.trim().length < 4) errs.subject = 'Write a short subject.'
     if (form.message.trim().length < 10) errs.message = 'Write the message residents should read (at least 10 characters).'
-    if (!form.app && !form.email) errs.channels = 'Pick at least one delivery channel.'
     setErrors(errs)
     if (Object.keys(errs).length) return
     onSend({
       zone: form.zone,
       subject: form.subject.trim(),
       message: form.message.trim(),
-      channels: [form.app && 'App', form.email && 'Email'].filter(Boolean),
+      // In-app is the only real delivery. Email/SMS is only logged as simulated.
+      channels: ['App', form.email && 'Email'].filter(Boolean),
     })
   }
 
@@ -60,29 +60,28 @@ export default function NotifyResidentsModal({ onSend, onClose }) {
           <textarea id="b-message" className="ct-input" maxLength={300} placeholder="e.g. The truck is running 20 minutes late due to road clearing. Please keep bins secured." value={form.message} onChange={set('message')} aria-invalid={!!errors.message} />
         </Field>
         <div className="ct-field">
-          <span className="ct-label">Delivery Channels</span>
+          <span className="ct-label">Delivery</span>
           <div className="broadcast-channels">
             <label className="ct-option">
-              <input type="checkbox" checked={form.app} onChange={set('app')} />
+              <input type="checkbox" checked disabled />
               <Bell size={16} />
               <span>
-                <strong>In-App Notification</strong>
-                <small>CleanTrack Resident app</small>
+                <strong>In-app message</strong>
+                <small>Delivered in the CleanTrack Resident app</small>
               </span>
             </label>
             <label className="ct-option">
               <input type="checkbox" checked={form.email} onChange={set('email')} />
               <Mail size={16} />
               <span>
-                <strong>Email</strong>
-                <small>Recorded only in this demo</small>
+                <strong>Also email residents</strong>
+                <small>Only residents who gave an email and allow email. Sent only if the server has email set up.</small>
               </span>
             </label>
           </div>
-          {errors.channels && <span className="ct-field__error">{errors.channels}</span>}
         </div>
         <div className="ct-alert ct-alert--warning">
-          Demo: the message appears in the Resident app&apos;s notifications. No email or SMS is actually sent.
+          The in-app message is always delivered. Email results appear in the Email Log (it says “not configured” if the server has no email set up). SMS is not available.
         </div>
       </form>
     </Modal>

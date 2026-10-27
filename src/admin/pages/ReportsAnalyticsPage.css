@@ -19,3 +19,7 @@
   background: var(--ct-green-50);
   border-top: 2px solid var(--ct-border);
 }
+
+.analytics-gap {
+  margin-bottom: 16px;
+}

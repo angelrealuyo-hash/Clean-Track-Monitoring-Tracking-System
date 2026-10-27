@@ -63,7 +63,7 @@ export default function DriverManagementPage() {
 
       <section className="ct-stats" aria-label="Driver summary">
         <StatCard label="Total Registered Drivers" icon={Contact} value={drivers.length} unit="drivers">
-          <span>Barangay San Antonio</span>
+          <span>Barangay collection drivers</span>
         </StatCard>
         <StatCard label="On Active Shift" icon={UserCheck} value={count('on-shift')} unit="drivers" highlight>
           <span>Currently operating</span>
@@ -134,6 +134,7 @@ export default function DriverManagementPage() {
                             <span>
                               <strong>{d.name}</strong>
                               <small className="ct-mono">{d.id}</small>
+                              <small>Sign-in: {{ active: 'Active', disabled: 'Disabled', none: 'No account' }[d.account ?? 'none']}</small>
                             </span>
                           </div>
                         </td>
@@ -212,8 +213,10 @@ export default function DriverManagementPage() {
                     type="button"
                     className="ct-btn ct-btn--secondary"
                     onClick={() => {
-                      dispatch({ type: 'truck/assignDriver', payload: { driverId: null } })
-                      toast(`${selected.name} removed from ${truck.id}`)
+                      dispatch({ type: 'truck/assignDriver', payload: { driverId: null } }).then((res) => {
+                        if (!res.ok) return
+                        toast(`${selected.name} removed from ${truck.id}`)
+                      })
                     }}
                   >
                     <Truck size={15} /> Unassign Truck
@@ -223,8 +226,10 @@ export default function DriverManagementPage() {
                     type="button"
                     className="ct-btn ct-btn--secondary"
                     onClick={() => {
-                      dispatch({ type: 'truck/assignDriver', payload: { driverId: selected.id } })
-                      toast(`${selected.name} assigned to ${truck.id}`)
+                      dispatch({ type: 'truck/assignDriver', payload: { driverId: selected.id } }).then((res) => {
+                        if (!res.ok) return
+                        toast(`${selected.name} assigned to ${truck.id}`)
+                      })
                     }}
                   >
                     <Truck size={15} /> Assign to {truck.id}
@@ -278,9 +283,11 @@ export default function DriverManagementPage() {
           driver={null}
           onClose={close}
           onSave={(form) => {
-            dispatch({ type: 'driver/add', payload: form })
-            toast(`${form.name} added`)
-            close()
+            dispatch({ type: 'driver/add', payload: form }).then((res) => {
+              if (!res.ok) return
+              toast(`${form.name} added`)
+              close()
+            })
           }}
         />
       )}
@@ -289,9 +296,11 @@ export default function DriverManagementPage() {
           driver={selected}
           onClose={close}
           onSave={(form) => {
-            dispatch({ type: 'driver/update', payload: { id: selected.id, patch: form } })
-            toast(`${form.name} updated`)
-            close()
+            dispatch({ type: 'driver/update', payload: { id: selected.id, patch: form } }).then((res) => {
+              if (!res.ok) return
+              toast(`${form.name} updated`)
+              close()
+            })
           }}
         />
       )}
@@ -300,9 +309,11 @@ export default function DriverManagementPage() {
           driver={selected}
           onClose={close}
           onSave={(status) => {
-            dispatch({ type: 'driver/update', payload: { id: selected.id, patch: { status } } })
-            toast(`${selected.name}: ${driverStatusMeta[status].label}`)
-            close()
+            dispatch({ type: 'driver/update', payload: { id: selected.id, patch: { status } } }).then((res) => {
+              if (!res.ok) return
+              toast(`${selected.name}: ${driverStatusMeta[status].label}`)
+              close()
+            })
           }}
         />
       )}
@@ -312,9 +323,11 @@ export default function DriverManagementPage() {
           confirmLabel="Delete Driver"
           onClose={close}
           onConfirm={() => {
-            dispatch({ type: 'driver/delete', payload: { id: selected.id } })
-            toast(`${selected.name} deleted`)
-            setSelectedId(drivers.find((d) => d.id !== selected.id)?.id ?? null)
+            dispatch({ type: 'driver/delete', payload: { id: selected.id } }).then((res) => {
+              if (!res.ok) return
+              toast(`${selected.name} deleted`)
+              setSelectedId(drivers.find((d) => d.id !== selected.id)?.id ?? null)
+            })
           }}
         >
           <p>

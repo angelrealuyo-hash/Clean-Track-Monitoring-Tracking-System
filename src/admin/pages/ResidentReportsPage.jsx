@@ -47,10 +47,10 @@ export default function ResidentReportsPage() {
         <StatCard label="Total Reports" icon={ClipboardList} value={reports.length} unit="reports">
           <span>All time (demo data)</span>
         </StatCard>
-        <StatCard label="New" icon={Inbox} value={count('submitted')} unit="reports" tone="amber">
+        <StatCard label="Submitted" icon={Inbox} value={count('submitted')} unit="reports" tone="amber">
           <span>Waiting for review</span>
         </StatCard>
-        <StatCard label="In Progress" icon={Wrench} value={count('in-progress')} unit="reports" highlight>
+        <StatCard label="Reviewing" icon={Wrench} value={count('in-progress')} unit="reports" highlight>
           <span>Being handled</span>
         </StatCard>
         <StatCard label="Resolved" icon={CircleCheck} value={count('resolved')} unit="reports">
@@ -199,8 +199,10 @@ export default function ResidentReportsPage() {
                 key={selected.id}
                 report={selected}
                 onSave={(patch) => {
-                  dispatch({ type: 'report/update', payload: { id: selected.id, ...patch } })
-                  toast(`Report ${selected.id} updated · resident notified`)
+                  dispatch({ type: 'report/update', payload: { id: selected.id, ...patch } }).then((res) => {
+                    if (!res.ok) return
+                    toast(`Report ${selected.id} updated · resident notified`)
+                  })
                 }}
               />
             </DetailSection>

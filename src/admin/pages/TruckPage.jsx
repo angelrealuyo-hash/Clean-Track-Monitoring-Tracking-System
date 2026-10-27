@@ -263,9 +263,11 @@ export default function TruckPage() {
           truck={truck}
           onClose={close}
           onSave={(patch) => {
-            dispatch({ type: 'truck/update', payload: patch })
-            toast(`${truck.id} updated`)
-            close()
+            dispatch({ type: 'truck/update', payload: patch }).then((res) => {
+              if (!res.ok) return
+              toast(`${truck.id} updated`)
+              close()
+            })
           }}
         />
       )}
@@ -275,10 +277,12 @@ export default function TruckPage() {
           drivers={drivers}
           onClose={close}
           onSave={(driverId) => {
-            dispatch({ type: 'truck/assignDriver', payload: { driverId } })
-            const name = drivers.find((d) => d.id === driverId)?.name
-            toast(name ? `${name} assigned to ${truck.id}` : `${truck.id} has no driver now`)
-            close()
+            dispatch({ type: 'truck/assignDriver', payload: { driverId } }).then((res) => {
+              if (!res.ok) return
+              const name = drivers.find((d) => d.id === driverId)?.name
+              toast(name ? `${name} assigned to ${truck.id}` : `${truck.id} has no driver now`)
+              close()
+            })
           }}
         />
       )}
@@ -287,9 +291,11 @@ export default function TruckPage() {
           truck={truck}
           onClose={close}
           onSave={(record) => {
-            dispatch({ type: 'truck/logMaintenance', payload: record })
-            toast('Maintenance logged')
-            close()
+            dispatch({ type: 'truck/logMaintenance', payload: record }).then((res) => {
+              if (!res.ok) return
+              toast('Maintenance logged')
+              close()
+            })
           }}
         />
       )}
