@@ -1,0 +1,44 @@
+.ct-toasts {
+  position: fixed;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.ct-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ct-green-900);
+  border-radius: var(--ct-radius-sm);
+  box-shadow: 0 8px 24px rgba(6, 78, 50, 0.3);
+  animation: ct-toast-in 0.2s ease;
+}
+
+.ct-toast--error {
+  background: var(--ct-red-600);
+}
+
+@keyframes ct-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* Phones: show at the top so the bottom tab bar stays usable. */
+@media (max-width: 600px) {
+  .ct-toasts {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    max-width: none;
+  }
+}

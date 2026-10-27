@@ -1,0 +1,47 @@
+.truck-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.truck-muted {
+  color: var(--ct-text-muted);
+}
+
+.truck-driver {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.truck-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ct-green-700);
+}
+
+.truck-amber {
+  color: #a06100;
+}
+
+.truck-last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  font-weight: 600;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+}
+
+.truck-last small {
+  flex-basis: 100%;
+  font-weight: 400;
+}

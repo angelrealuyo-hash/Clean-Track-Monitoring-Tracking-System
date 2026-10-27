@@ -1,0 +1,319 @@
+/* Shared cards, progress bars and lists (PDF dashboard styling). */
+
+.ct-card {
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius);
+  box-shadow: var(--ct-shadow);
+}
+
+.ct-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 16px 16px 0;
+}
+
+.ct-card__header h2 {
+  font-size: 16px;
+  color: var(--ct-text);
+}
+
+.ct-card__header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.ct-card__body {
+  padding: 16px;
+}
+
+.ct-progress {
+  height: 6px;
+  overflow: hidden;
+  background: #dbe9e0;
+  border-radius: 999px;
+}
+
+.ct-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--ct-green-900);
+  border-radius: inherit;
+  transition: width 0.4s ease;
+}
+
+.ct-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.ct-kv dt {
+  color: var(--ct-text-muted);
+}
+
+.ct-kv dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.ct-empty {
+  padding: 24px 16px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--ct-text-muted);
+}
+
+.ct-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ct-text-muted);
+  background: #eef1ef;
+  border-radius: 4px;
+}
+
+/* Vertical stop timeline (View Route, Dashboard). */
+.ct-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ct-timeline li {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+.ct-timeline li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  left: 6px;
+  width: 2px;
+  background: var(--ct-border);
+}
+
+.ct-timeline__dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  background: #fff;
+  border: 2px solid var(--ct-green-700);
+  border-radius: 50%;
+}
+
+.ct-timeline li.is-collected .ct-timeline__dot { background: var(--ct-green-900); border-color: var(--ct-green-900); }
+.ct-timeline li.is-next .ct-timeline__dot { background: var(--ct-amber-500); border-color: var(--ct-amber-500); }
+.ct-timeline li.is-depot .ct-timeline__dot { background: var(--ct-blue-600); border-color: var(--ct-blue-600); }
+
+.ct-timeline strong {
+  display: block;
+  font-size: 13px;
+}
+
+.ct-timeline li.is-next strong {
+  color: var(--ct-green-900);
+}
+
+.ct-timeline li.is-pending strong {
+  color: var(--ct-text-muted);
+}
+
+.ct-timeline small {
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.ct-mono {
+  font-family: var(--ct-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Data tables (Truck, Drivers, Routes, Collection, Reports). */
+.ct-table-wrap {
+  overflow-x: auto;
+}
+
+.ct-table {
+  width: 100%;
+  /* Below this width the table scrolls inside its card instead of squashing. */
+  min-width: 600px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ct-table th {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ct-text-muted);
+  background: var(--ct-green-50);
+  border-bottom: 1px solid var(--ct-border);
+}
+
+.ct-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ct-border);
+}
+
+.ct-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ct-table tbody tr.is-clickable {
+  cursor: pointer;
+}
+
+.ct-table tbody tr.is-clickable:hover {
+  background: #f5fcf7;
+}
+
+.ct-table tbody tr.is-selected {
+  background: var(--ct-green-100);
+  box-shadow: inset 3px 0 0 var(--ct-green-900);
+}
+
+.ct-table td small {
+  display: block;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.ct-table .is-right {
+  text-align: right;
+}
+
+.ct-table__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.ct-table__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+  border-top: 1px solid var(--ct-border);
+}
+
+/* Search + filter row above a table */
+.ct-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ct-border);
+}
+
+.ct-toolbar .ct-input-group {
+  flex: 1 1 240px;
+}
+
+.ct-toolbar select.ct-input {
+  width: auto;
+  min-width: 160px;
+  padding: 9px 12px;
+}
+
+/* Two-panel layout: list on the left, details on the right (PDF p.12, 18, 21, 26, 27) */
+.ct-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* minmax(0, 1fr), not 1fr: lets wide tables scroll inside their card
+   instead of stretching the page sideways on phones. */
+@media (max-width: 1200px) {
+  .ct-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ct-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1100px) {
+  .ct-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phones: compact 2-column summary cards */
+@media (max-width: 520px) {
+  .ct-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .ct-stats .stat-card {
+    padding: 12px;
+  }
+
+  .ct-stats .stat-card__value {
+    font-size: 22px;
+  }
+
+  .ct-stats .stat-card__icon {
+    display: none;
+  }
+}
+
+.ct-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-radius: 50%;
+}
+
+.ct-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ct-person strong {
+  display: block;
+}
+
+/* IDs like REP-2024-094 or STP-02 never break across lines */
+.ct-table .ct-mono {
+  white-space: nowrap;
+}

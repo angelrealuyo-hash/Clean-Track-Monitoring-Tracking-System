@@ -1,0 +1,16 @@
+.ct-logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--ct-green-900);
+  border-radius: 8px;
+}
+
+.ct-brand-logo {
+  display: inline-block;
+  flex-shrink: 0;
+  max-width: none;
+  object-fit: contain;
+}

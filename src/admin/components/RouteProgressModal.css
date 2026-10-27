@@ -1,0 +1,45 @@
+.route-modal__sub {
+  margin-top: -4px !important;
+  font-size: 12px;
+}
+
+.route-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.route-modal__stats div {
+  padding: 10px 8px;
+  text-align: center;
+  background: var(--ct-green-50);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+}
+
+.route-modal__stats span {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ct-text-muted);
+}
+
+.route-modal__stats strong {
+  font-family: var(--ct-font-heading);
+  font-size: 22px;
+}
+
+.route-modal__stats .is-green { color: var(--ct-green-900); }
+.route-modal__stats .is-amber { color: #a06100; }
+
+.route-modal__list {
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.route-modal__note .status-badge {
+  white-space: normal;
+}

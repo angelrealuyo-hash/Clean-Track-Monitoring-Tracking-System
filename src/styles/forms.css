@@ -1,0 +1,406 @@
+/* Shared form controls, buttons and info boxes used by all three apps. */
+
+.ct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.ct-field__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.ct-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ct-text);
+}
+
+.ct-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+}
+
+.ct-input-group:focus-within {
+  border-color: var(--ct-green-700);
+  box-shadow: 0 0 0 3px rgba(23, 112, 74, 0.15);
+}
+
+.ct-input-group > svg {
+  flex-shrink: 0;
+  color: var(--ct-text-muted);
+}
+
+.ct-input-group input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ct-text);
+}
+
+.ct-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+  background: var(--ct-surface);
+  color: var(--ct-text);
+}
+
+.ct-input:focus {
+  outline: 0;
+  border-color: var(--ct-green-700);
+  box-shadow: 0 0 0 3px rgba(23, 112, 74, 0.15);
+}
+
+.ct-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ct-text-muted);
+  border-radius: var(--ct-radius-sm);
+  cursor: pointer;
+}
+
+.ct-icon-btn:hover {
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+}
+
+.ct-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ct-green-700);
+  cursor: pointer;
+}
+
+.ct-link-btn:hover {
+  text-decoration: underline;
+}
+
+.ct-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ct-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ct-green-900);
+}
+
+/* Buttons */
+.ct-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  border-radius: var(--ct-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.ct-btn--primary {
+  color: #fff;
+  background: var(--ct-green-900);
+}
+
+.ct-btn--primary:hover {
+  background: #043b26;
+}
+
+.ct-btn--secondary {
+  color: var(--ct-text);
+  background: var(--ct-surface);
+  border-color: var(--ct-border);
+}
+
+.ct-btn--secondary:hover {
+  background: var(--ct-green-50);
+}
+
+.ct-btn--soft {
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-color: #bfe3cc;
+}
+
+.ct-btn--soft:hover {
+  background: #cfeedb;
+}
+
+.ct-btn--danger {
+  color: var(--ct-red-600);
+  background: var(--ct-red-100);
+  border-color: #f6c2be;
+}
+
+.ct-btn--block {
+  width: 100%;
+}
+
+/* Info / error boxes */
+.ct-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border: 1px solid #bfe3cc;
+  border-radius: var(--ct-radius-sm);
+}
+
+.ct-alert > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ct-alert--error {
+  color: var(--ct-red-600);
+  background: var(--ct-red-100);
+  border-color: #f6c2be;
+}
+
+.ct-alert--warning {
+  color: #7a4a00;
+  background: var(--ct-amber-100);
+  border-color: #f3d98f;
+}
+
+.ct-divider-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ct-text-muted);
+}
+
+.ct-divider-text::before,
+.ct-divider-text::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ct-border);
+}
+
+.ct-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* Textareas and selects reuse .ct-input */
+textarea.ct-input {
+  min-height: 84px;
+  resize: vertical;
+}
+
+select.ct-input {
+  cursor: pointer;
+}
+
+.ct-field__hint {
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.ct-field__error {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ct-red-600);
+}
+
+.ct-input[aria-invalid='true'] {
+  border-color: var(--ct-red-600);
+}
+
+.ct-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+.ct-form-grid .is-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 520px) {
+  .ct-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* On/off switch (Settings, PDF p.32-33) */
+.ct-switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 42px;
+  height: 24px;
+}
+
+.ct-switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ct-switch span {
+  position: absolute;
+  inset: 0;
+  background: #c9d6ce;
+  border-radius: 999px;
+  transition: background 0.15s;
+  pointer-events: none;
+}
+
+.ct-switch span::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s;
+}
+
+.ct-switch input:checked + span {
+  background: var(--ct-green-900);
+}
+
+.ct-switch input:checked + span::after {
+  transform: translateX(18px);
+}
+
+.ct-switch input:focus-visible + span {
+  box-shadow: 0 0 0 3px rgba(23, 112, 74, 0.3);
+}
+
+/* Radio option cards (Assign Driver, Change Status) */
+.ct-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ct-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+  cursor: pointer;
+}
+
+.ct-option:has(input:checked) {
+  background: var(--ct-green-50);
+  border-color: var(--ct-green-700);
+}
+
+.ct-option input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ct-green-900);
+}
+
+.ct-option strong {
+  display: block;
+  font-size: 13px;
+}
+
+.ct-option small {
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+/* Segmented tabs (Notifications: Dispatch Feed / Resident Outbox) */
+.ct-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+}
+
+.ct-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ct-text);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ct-tabs button[aria-selected='true'] {
+  color: #fff;
+  background: var(--ct-green-900);
+}
+
+.ct-tabs .ct-count {
+  min-width: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-radius: 999px;
+}
+
+.ct-btn--danger-solid {
+  color: #fff;
+  background: var(--ct-red-600);
+}
+
+.ct-btn--danger-solid:hover {
+  background: #a51c19;
+}
+
+.ct-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

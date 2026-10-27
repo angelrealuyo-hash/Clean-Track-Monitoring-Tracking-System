@@ -1,0 +1,7 @@
+.collection-note {
+  padding: 8px;
+  font-size: 12px;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+}

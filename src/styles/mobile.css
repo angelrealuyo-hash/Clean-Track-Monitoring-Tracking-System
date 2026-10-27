@@ -1,0 +1,459 @@
+/* Shared building blocks for the Resident and Driver phone screens (PDF p.34-49). */
+
+.m-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 20px;
+}
+
+.m-card {
+  padding: 14px;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(6, 78, 50, 0.05);
+}
+
+.m-card--highlight {
+  border: 2px solid var(--ct-green-700);
+}
+
+.m-card--accent {
+  border-left: 4px solid var(--ct-green-900);
+}
+
+.m-card--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.m-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.m-row--between {
+  justify-content: space-between;
+}
+
+.m-row--top {
+  align-items: flex-start;
+}
+
+.m-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.m-h1 {
+  font-family: var(--ct-font-heading);
+  font-size: 20px;
+  color: var(--ct-text);
+}
+
+.m-h2 {
+  font-family: var(--ct-font-heading);
+  font-size: 16px;
+  color: var(--ct-text);
+}
+
+.m-muted {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.m-eyebrow {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ct-text-muted);
+}
+
+.m-section-title {
+  margin: 4px 2px -4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ct-text);
+}
+
+.m-big {
+  font-family: var(--ct-font-heading);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ct-green-900);
+}
+
+.m-big {
+  display: block;
+}
+
+.m-big small {
+  display: inline;
+  font-family: var(--ct-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ct-text-muted);
+}
+
+/* Sub-page header: ← Title */
+.m-subhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -14px -14px 0;
+  padding: 10px 14px;
+  background: var(--ct-surface);
+  border-bottom: 1px solid var(--ct-border);
+}
+
+.m-subhead h1 {
+  font-size: 16px;
+  color: var(--ct-green-900);
+}
+
+.m-subhead p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ct-text-muted);
+}
+
+/* Filter chips (All / Active / Resolved) */
+.m-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.m-chips button {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ct-text);
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.m-chips button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--ct-green-900);
+  border-color: var(--ct-green-900);
+}
+
+/* Quick action tiles */
+.m-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.m-action {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  color: var(--ct-text);
+  text-align: left;
+  text-decoration: none;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.m-action:hover {
+  border-color: var(--ct-green-700);
+}
+
+.m-action strong {
+  font-size: 13px;
+}
+
+.m-action small {
+  font-size: 11px;
+  color: var(--ct-text-muted);
+}
+
+.m-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-radius: 8px;
+}
+
+.m-icon--red { color: var(--ct-red-600); background: var(--ct-red-100); }
+.m-icon--amber { color: #a06100; background: var(--ct-amber-100); }
+.m-icon--blue { color: var(--ct-blue-600); background: var(--ct-blue-100); }
+
+/* Label/value rows */
+.m-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.m-kv dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ct-text-muted);
+}
+
+.m-kv dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.m-box {
+  padding: 10px 12px;
+  font-size: 13px;
+  background: var(--ct-green-50);
+  border: 1px solid var(--ct-border);
+  border-radius: 8px;
+}
+
+.m-box small,
+.m-box > .m-muted {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ct-text-muted);
+}
+
+.m-box-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Switch rows (Profile, Track Truck, Schedule) */
+.m-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.m-toggle + .m-toggle {
+  border-top: 1px solid var(--ct-border);
+}
+
+.m-toggle strong {
+  display: block;
+  font-size: 13px;
+}
+
+.m-toggle p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--ct-text-muted);
+}
+
+/* Status steps: Logged — In progress — Resolved (PDF p.39) */
+.m-steps {
+  display: flex;
+  align-items: center;
+  margin: 10px 0 2px;
+  padding: 0;
+  list-style: none;
+}
+
+.m-steps li {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ct-text-muted);
+}
+
+.m-steps li::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--ct-border);
+}
+
+.m-steps li:first-child::before {
+  display: none;
+}
+
+.m-steps li span {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border: 2px solid var(--ct-border);
+  border-radius: 50%;
+}
+
+.m-steps li.is-done {
+  color: var(--ct-green-900);
+}
+
+.m-steps li.is-done span {
+  background: var(--ct-green-900);
+  border-color: var(--ct-green-900);
+}
+
+.m-steps li.is-done::before {
+  background: var(--ct-green-900);
+}
+
+/* Small map inside a card */
+.m-map {
+  height: 210px;
+  border-radius: 0;
+}
+
+.m-map--tall {
+  height: 300px;
+}
+
+/* Photo picker */
+.m-photo-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ct-green-900);
+  background: var(--ct-green-50);
+  border: 1.5px dashed #9fd0b2;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.m-photo-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.m-photo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  font-size: 12px;
+  background: var(--ct-green-50);
+  border: 1px solid var(--ct-border);
+  border-radius: 8px;
+}
+
+.m-photo img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* Category radio cards (Report a Problem, PDF p.38 / p.47) */
+.m-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.m-choice:has(input:checked) {
+  border: 2px solid var(--ct-green-900);
+  padding: 9px 11px;
+}
+
+.m-choice input {
+  order: 3;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ct-green-900);
+}
+
+.m-choice strong {
+  display: block;
+  font-size: 13px;
+}
+
+.m-choice small {
+  font-size: 11px;
+  color: var(--ct-text-muted);
+}
+
+.m-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-choice-grid .m-choice {
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+}
+
+.m-choice-grid .m-choice input {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+/* Notification cards */
+.m-notif {
+  position: relative;
+  border-left: 4px solid var(--ct-border);
+}
+
+.m-notif.is-unread {
+  border-left-color: var(--ct-green-900);
+}
+
+.m-notif.is-high.is-unread {
+  border-left-color: var(--ct-red-600);
+}
+
+.m-notif p {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--ct-text-muted);
+}
+
+a.m-box {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.m-box:hover {
+  border-color: var(--ct-green-700);
+}

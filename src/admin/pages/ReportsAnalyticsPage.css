@@ -1,0 +1,25 @@
+.analytics-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1000px) {
+  .analytics-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.analytics-table .is-green { color: var(--ct-green-900); font-weight: 600; }
+.analytics-table .is-red { color: var(--ct-red-600); font-weight: 600; }
+
+.analytics-table tfoot td {
+  padding: 12px 14px;
+  background: var(--ct-green-50);
+  border-top: 2px solid var(--ct-border);
+}
+
+.analytics-gap {
+  margin-bottom: 16px;
+}

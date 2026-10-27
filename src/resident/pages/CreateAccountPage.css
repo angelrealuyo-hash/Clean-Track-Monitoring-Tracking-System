@@ -1,0 +1,55 @@
+.signup-intro {
+  margin: 4px 0 16px !important;
+}
+
+.signup-prefix {
+  padding: 4px 8px;
+  margin-left: -6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-radius: 4px;
+}
+
+.signup-select {
+  flex: 1;
+  padding: 10px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ct-text);
+}
+
+.signup-strength {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.signup-strength span {
+  height: 4px;
+  background: var(--ct-border);
+  border-radius: 2px;
+}
+
+.signup-strength small {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--ct-text-muted);
+}
+
+.signup-strength.is-1 span:nth-child(1) { background: var(--ct-red-600); }
+.signup-strength.is-2 span:nth-child(-n + 2) { background: var(--ct-amber-500); }
+.signup-strength.is-3 span { background: var(--ct-green-900); }
+
+.signup-agree {
+  align-items: flex-start;
+  margin: 4px 0 6px;
+  line-height: 1.4;
+}
+
+.signup-submit {
+  margin-top: 14px;
+}
