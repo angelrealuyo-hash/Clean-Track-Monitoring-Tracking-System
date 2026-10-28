@@ -12,15 +12,15 @@ import App from './App.jsx'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <DataProvider>
+      <ToastProvider>
         <AuthProvider>
-          <ConnectedTrackingProvider>
-            <ToastProvider>
+          <DataProvider>
+            <ConnectedTrackingProvider>
               <App />
-            </ToastProvider>
-          </ConnectedTrackingProvider>
+            </ConnectedTrackingProvider>
+          </DataProvider>
         </AuthProvider>
-      </DataProvider>
+      </ToastProvider>
     </BrowserRouter>
   </StrictMode>,
 )

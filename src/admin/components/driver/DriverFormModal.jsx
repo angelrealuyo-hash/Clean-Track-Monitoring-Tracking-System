@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { UserPen, UserPlus } from 'lucide-react'
 import Modal from '../../../components/Modal.jsx'
 import Field from '../../../components/Field.jsx'
+import AvatarPicker from '../../../components/AvatarPicker.jsx'
+import { initials } from '../../../store/dataReducer.js'
 import { shiftOptions } from '../../../data/drivers.js'
 import { driverStatusMeta } from '../../../store/selectors.js'
 
 // Add or edit a driver. `driver` is null when adding.
-export default function DriverFormModal({ driver, onSave, onClose }) {
+export default function DriverFormModal({ driver, onSave, onClose, saving = false }) {
   const editing = Boolean(driver)
   const [form, setForm] = useState({
     name: driver?.name ?? '',
@@ -14,21 +16,37 @@ export default function DriverFormModal({ driver, onSave, onClose }) {
     license: driver?.license ?? 'Professional Driver (Class 2)',
     shift: driver?.shift ?? shiftOptions[0],
     status: driver?.status ?? 'standby',
+    email: driver?.email ?? '',
+    password: '',
+    account: driver?.account === 'disabled' ? 'disabled' : 'active',
+    photo: driver?.photo ?? null,
   })
   const [errors, setErrors] = useState({})
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   function submit(e) {
     e.preventDefault()
+    if (saving) return
     const errs = {}
     if (form.name.trim().length < 3) errs.name = 'Enter the driver’s full name.'
     // Philippine mobile: +63 9XX XXX XXXX or 09XX XXX XXXX
     const digits = form.phone.replace(/\D/g, '')
     if (!/^(639\d{9}|09\d{9})$/.test(digits)) errs.phone = 'Use a PH mobile number, e.g. +63 917 555 0142.'
     if (!form.license.trim()) errs.license = 'License type is required.'
+    const email = form.email.trim().toLowerCase()
+    if (email && !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) errs.email = 'Use a plain email like name@example.com.'
+    if (form.password && form.password.length < 6) errs.password = 'At least 6 characters.'
+    if (form.password && !email) errs.email = 'An email is needed to sign in.'
     setErrors(errs)
     if (Object.keys(errs).length) return
-    onSave({ ...form, name: form.name.trim().replace(/\s+/g, ' '), license: form.license.trim(), phone: form.phone.trim() })
+    const out = { name: form.name.trim().replace(/\s+/g, ' '), license: form.license.trim(), phone: form.phone.trim(), shift: form.shift, email }
+    if (!editing) out.status = form.status
+    if (form.password) out.password = form.password
+    // Sign-in on/off only applies to drivers who have an account.
+    if (editing && driver.account !== 'none') out.account = form.account
+    // Only send the picture when it changed (new, replaced or removed).
+    if (form.photo !== (driver?.photo ?? null)) out.photo = form.photo
+    onSave(out)
   }
 
   return (
@@ -43,13 +61,17 @@ export default function DriverFormModal({ driver, onSave, onClose }) {
           <button type="button" className="ct-btn ct-btn--secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" form="driver-form" className="ct-btn ct-btn--primary">
-            {editing ? 'Update Driver' : 'Add Driver'}
+          <button type="submit" form="driver-form" className="ct-btn ct-btn--primary" disabled={saving}>
+            {saving ? 'Saving…' : editing ? 'Update Driver' : 'Add Driver'}
           </button>
         </>
       }
     >
       <form id="driver-form" className="ct-form-grid" onSubmit={submit} noValidate>
+        <div className="ct-field is-wide">
+          <span className="ct-label">Profile Picture (optional)</span>
+          <AvatarPicker value={form.photo} onChange={(photo) => setForm((f) => ({ ...f, photo }))} initials={initials(form.name || '?')} name={form.name} busy={saving} />
+        </div>
         <Field label="Full Name" htmlFor="d-name" required error={errors.name} className="is-wide">
           <input id="d-name" className="ct-input" value={form.name} onChange={set('name')} aria-invalid={!!errors.name} autoFocus />
         </Field>
@@ -74,6 +96,25 @@ export default function DriverFormModal({ driver, onSave, onClose }) {
                   {m.label}
                 </option>
               ))}
+            </select>
+          </Field>
+        )}
+        <Field label="Sign-in email (optional)" htmlFor="d-email" error={errors.email} hint="Needed for the driver to use the Driver app.">
+          <input id="d-email" className="ct-input" type="email" value={form.email} onChange={set('email')} aria-invalid={!!errors.email} />
+        </Field>
+        <Field
+          label={editing ? 'New password (optional)' : 'Password (optional)'}
+          htmlFor="d-pw"
+          error={errors.password}
+          hint={editing ? 'Leave empty to keep the current password.' : 'Give this to the driver privately.'}
+        >
+          <input id="d-pw" className="ct-input" type="password" autoComplete="new-password" value={form.password} onChange={set('password')} aria-invalid={!!errors.password} />
+        </Field>
+        {editing && driver.account !== 'none' && (
+          <Field label="Sign-in account" htmlFor="d-account">
+            <select id="d-account" className="ct-input" value={form.account} onChange={set('account')}>
+              <option value="active">Active (can sign in)</option>
+              <option value="disabled">Disabled (cannot sign in)</option>
             </select>
           </Field>
         )}

@@ -25,7 +25,7 @@ export default function ResidentLayout() {
       <div className="mobile-header__title">
         <strong>CleanTrack Resident</strong>
         <span>
-          {data.settings.barangayName}
+          {data.settings.barangayName || 'Barangay garbage pickup'}
           {resident ? ` · ${resident.purok}` : ''}
         </span>
       </div>

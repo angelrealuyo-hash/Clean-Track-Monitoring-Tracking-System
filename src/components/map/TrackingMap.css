@@ -1,5 +1,8 @@
 .ct-map {
   position: relative;
+  /* Keep Leaflet's layers (z-index 400+) inside the map, so sticky headers
+     and bars are never covered when the page scrolls. */
+  isolation: isolate;
   overflow: hidden;
   background: #e6efe9;
   border-radius: var(--ct-radius);
@@ -104,3 +107,4 @@
 .ct-map-legend .is-next { background: var(--ct-amber-500); }
 .ct-map-legend .is-pending { background: #fff; border: 2px solid var(--ct-green-700); }
 .ct-map-legend .is-depot { background: var(--ct-blue-600); }
+.ct-map-legend .is-missed { background: var(--ct-red-600); }

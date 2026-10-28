@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { isCollectionDay, isPickupDate, scheduleLabel } from '../../data/schedule.js'
+import { todayISO } from '../../utils/format.js'
 import {
   ArrowRight,
   CircleCheck,
@@ -13,11 +15,12 @@ import MapLegend from '../../components/map/MapLegend.jsx'
 import ErrorBoundary from '../../components/ErrorBoundary.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import StatCard from '../components/StatCard.jsx'
+import StatusBar from '../components/charts/StatusBar.jsx'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { STATUS_LABELS, STATUS_TONES, isCollectionStop } from '../../services/trackingSimulation.js'
 import { reportCategories } from '../../data/reports.js'
 import { useData } from '../../store/dataContext.js'
-import { getCollectionSummary, getStopStatus, stopStatusMeta } from '../../store/selectors.js'
+import { getCollectionSummary, getStopStatus, stopStatusMeta, truckStatusMeta } from '../../store/selectors.js'
 import { formatDateTime, formatTime, todayName } from '../../utils/format.js'
 import '../components/AdminPage.css'
 import './DashboardPage.css'
@@ -37,15 +40,21 @@ const truckStatusText = {
 export default function DashboardPage() {
   const { route, state, progress, error } = useTracking()
   const { data } = useData()
-  const { truck, drivers, collectionLog } = data
+  const { truck, drivers } = data
   const driver = drivers.find((d) => d.id === truck.driverId)
   const onShift = drivers.filter((d) => d.status === 'on-shift').length
   const standby = drivers.filter((d) => d.status === 'standby').length
   const openReports = data.reports.filter((r) => r.status !== 'resolved')
   const recentActivity = data.notifications.filter((n) => n.audience === 'admin').slice(0, 3)
-  const summary = error ? null : getCollectionSummary(route, progress, collectionLog)
+  const summary = error ? null : getCollectionSummary(route, progress)
   const today = todayName()
   const todaysRun = data.weeklySchedule.find((d) => d.day === today)
+  // Next 3 pickup days after today, from Routes & Schedules.
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const upcoming = [1, 2, 3, 4, 5, 6, 7]
+    .map((i) => data.weeklySchedule.find((d) => d.day === DAYS[(DAYS.indexOf(today) + i) % 7]))
+    .filter((d) => d && isCollectionDay(d.day))
+    .slice(0, 3)
 
   return (
     <div className="admin-page dashboard">
@@ -73,7 +82,10 @@ export default function DashboardPage() {
           <span>
             <b>{truck.id}</b> · {truck.type}
           </span>
-          <span>{truckStatusText[state.status]}</span>
+          <span>
+            <StatusBadge tone={truckStatusMeta[truck.status].tone}>{truckStatusMeta[truck.status].label}</StatusBadge>
+          </span>
+          <span>{data.activeRunId ? 'Route in progress · ' : ''}{truckStatusText[state.status]}</span>
         </StatCard>
 
         <StatCard label="Drivers" icon={Contact} value={drivers.length} unit="Drivers">
@@ -103,7 +115,7 @@ export default function DashboardPage() {
           <span className="dashboard__chips">
             {openReports.map((r) => (
               <span key={r.id} className="ct-tag">
-                {r.status === 'in-progress' ? 'In progress' : 'New'}
+                {r.status === 'in-progress' ? 'Reviewing' : 'Submitted'}
               </span>
             ))}
           </span>
@@ -118,7 +130,7 @@ export default function DashboardPage() {
               <h2>Collection Route &amp; Truck Map</h2>
               <p>Simulated truck position on the demo route</p>
             </div>
-            <StatusBadge tone="amber">SIMULATED GPS</StatusBadge>
+            <StatusBadge tone="amber">SIMULATED GPS — DEMO MODE</StatusBadge>
           </div>
           <div className="ct-card__body">
             {error ? (
@@ -203,30 +215,74 @@ export default function DashboardPage() {
               <dt>Start time</dt>
               <dd>{route.startTime}</dd>
               <dt>Today&apos;s collection</dt>
-              <dd>{todaysRun?.wasteType ?? 'No collection'}</dd>
+              <dd>
+                {isPickupDate(todayISO(), data.scheduleExceptions)
+                  ? 'Garbage collection day'
+                  : isCollectionDay(today)
+                    ? 'No collection (holiday / suspension)'
+                    : `No collection (${scheduleLabel} only)`}
+              </dd>
               <dt>Time window</dt>
-              <dd>{todaysRun?.window ?? '—'}</dd>
+              <dd>{isPickupDate(todayISO(), data.scheduleExceptions) ? todaysRun?.window : '—'}</dd>
+              <dt>Upcoming</dt>
+              <dd>
+                {upcoming.length === 0
+                  ? 'No other pickup days'
+                  : upcoming.map((d) => (
+                      <span key={d.day} className="dashboard__upcoming">
+                        {d.day}, {d.window.split(' - ')[0]}
+                      </span>
+                    ))}
+              </dd>
             </dl>
 
             <div>
-              <h3 className="dashboard__subhead">Collection Status</h3>
+              <h3 className="dashboard__subhead">Pickup Status · stops still to do</h3>
+              {summary && (
+                <div className="dashboard__chart">
+                  <StatusBar
+                    label="Pickup points by status"
+                    total={summary.total}
+                    segments={[
+                      { key: 'collected', label: 'Collected', value: summary.collected },
+                      { key: 'next', label: 'Next', value: summary.next },
+                      { key: 'pending', label: 'Not yet', value: summary.pending },
+                      { key: 'missed', label: 'Missed', value: summary.missed },
+                    ]}
+                  />
+                </div>
+              )}
               {error ? (
                 <p className="ct-empty">No stops to show.</p>
               ) : (
-                <ul className="dashboard__stops">
-                  {route.stops.filter(isCollectionStop).map((stop) => {
-                    const { tone, label } = stopStatusMeta[getStopStatus(stop, progress, collectionLog)]
-                    return (
-                      <li key={stop.id}>
-                        <span>
-                          <strong>{stop.name}</strong>
-                          <small>{stop.purok}</small>
-                        </span>
-                        <StatusBadge tone={tone}>{label}</StatusBadge>
-                      </li>
-                    )
-                  })}
-                </ul>
+                (() => {
+                  // Only stops that still need attention; the full list is in Collection Monitoring.
+                  const open = route.stops.filter(isCollectionStop).filter((stop) => getStopStatus(stop, progress) !== 'collected')
+                  if (open.length === 0) return <p className="ct-empty">All pickup points are collected.</p>
+                  return (
+                    <>
+                      <ul className="dashboard__stops">
+                        {open.slice(0, 5).map((stop) => {
+                          const { tone, label } = stopStatusMeta[getStopStatus(stop, progress)]
+                          return (
+                            <li key={stop.id}>
+                              <span>
+                                <strong>{stop.name}</strong>
+                                <small>{stop.purok}</small>
+                              </span>
+                              <StatusBadge tone={tone}>{label}</StatusBadge>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                      {open.length > 5 && (
+                        <Link to="/admin/collection" className="ct-link-btn">
+                          +{open.length - 5} more not yet collected →
+                        </Link>
+                      )}
+                    </>
+                  )
+                })()
               )}
             </div>
           </div>
@@ -237,7 +293,7 @@ export default function DashboardPage() {
           <div className="ct-card__header">
             <div>
               <h2>Recent Activity</h2>
-              <p>Latest admin notifications (sample data)</p>
+              <p>Latest admin notifications</p>
             </div>
           </div>
           <div className="ct-card__body">

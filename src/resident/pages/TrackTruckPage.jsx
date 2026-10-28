@@ -33,8 +33,8 @@ export default function TrackTruckPage() {
           <ArrowLeft size={18} />
         </Link>
         <div className="m-grow">
-          <h1>Truck Live Tracking</h1>
-          <p>{data.settings.barangayName}</p>
+          <h1>Where is the Truck?</h1>
+          <p>Demo truck location</p>
         </div>
         <StatusBadge tone={STATUS_TONES[state.status]}>{STATUS_LABELS[state.status]}</StatusBadge>
       </header>
@@ -42,7 +42,7 @@ export default function TrackTruckPage() {
       <div className="ct-alert ct-alert--warning">
         <Info size={15} />
         <span>
-          <strong>Simulated demo data:</strong> truck location and movement are not real GPS.
+          <strong>Demo only:</strong> this is a practice truck, not the real truck location.
         </span>
       </div>
 
@@ -50,7 +50,7 @@ export default function TrackTruckPage() {
         <div className="ct-alert res-near" role="status">
           <BellRing size={16} />
           <span>
-            <strong>Heads up!</strong> The truck is about to reach {resident.purok}. Please put your bins out now.
+            <strong>Almost here!</strong> The truck is coming to {resident.purok}. Please bring out your trash now.
           </span>
         </div>
       )}
@@ -60,26 +60,26 @@ export default function TrackTruckPage() {
           <p className="ct-empty">{t.error}</p>
         ) : (
           <div className="res-map-wrap">
-            <ErrorBoundary fallback={<p className="ct-empty">Map unavailable.</p>}>
+            <ErrorBoundary fallback={<p className="ct-empty">The map could not load.</p>}>
               <TrackingMap className="m-map m-map--tall" route={route} state={state} progress={progress} focusRequest={focus} truckLabel={truck.id} />
             </ErrorBoundary>
             <button type="button" className="ct-btn ct-btn--secondary res-map-btn" onClick={() => setFocus({ type: 'truck', id: Date.now() })}>
-              <Crosshair size={14} /> Truck
+              <Crosshair size={14} /> Find truck
             </button>
           </div>
         )}
         <div className="res-card-head">
-          <MapLegend />
+          <MapLegend plain />
         </div>
       </section>
 
       {state.status === 'idle' && (
         <section className="m-card res-demo">
           <p className="m-muted">
-            The truck has not started its route yet. In the real system the driver starts the route from the Driver app.
+            The truck has not left yet. (Normally the driver starts it.)
           </p>
           <button type="button" className="ct-btn ct-btn--soft ct-btn--block" onClick={t.start}>
-            <Play size={15} /> Start demo simulation
+            <Play size={15} /> Demo: start the truck
           </button>
         </section>
       )}
@@ -91,22 +91,22 @@ export default function TrackTruckPage() {
           </span>
           <div className="m-grow">
             <strong>Truck {truck.id}</strong>
-            <p className="m-muted">{truck.type}</p>
+            <p className="m-muted">Garbage truck</p>
           </div>
           <StatusBadge tone={t.tone}>{t.label}</StatusBadge>
         </div>
         <div className="m-box res-gap m-row m-row--between">
-          <span>{driver?.name ?? 'Driver not assigned'}</span>
+          <span>{driver?.name ?? 'No driver yet'}</span>
           <strong>{route.shortName}</strong>
         </div>
         <div className="m-box-grid res-gap">
           <div className="m-box">
-            <small>Your Purok</small>
+            <small>Your area</small>
             <strong className="m-big">{resident.purok}</strong>
-            <span className="m-muted">{t.distance.stop?.name ?? 'Not on route'}</span>
+            <span className="m-muted">{t.distance.stop?.name ?? 'Not on the route'}</span>
           </div>
           <div className="m-box">
-            <small>Route Stops</small>
+            <small>Stops done</small>
             <strong className="m-big">
               {progress?.collected ?? 0}
               <small> / {progress?.total ?? 0}</small>
@@ -117,26 +117,26 @@ export default function TrackTruckPage() {
           </div>
         </div>
         <p className="m-muted res-gap">
-          <RefreshCw size={11} /> Last update: {state.updatedAt ? `${formatTime(state.updatedAt)} (simulated)` : 'waiting for the truck to start'}
+          <RefreshCw size={11} /> Updated: {state.updatedAt ? formatTime(state.updatedAt) : 'waiting for the truck to leave'}
         </p>
       </section>
 
       <section className="m-card">
-        <p className="m-eyebrow">Resident Proximity Alert</p>
+        <p className="m-eyebrow">Alert</p>
         <ToggleRow
           icon={BellRing}
-          label="Alert me when the truck is next"
-          hint="Shows a banner on this screen. Change it in Profile too."
+          label="Tell me when the truck is near"
+          hint="A message will show on this screen."
           checked={resident.prefs.truckNearby}
           onChange={setPref}
         />
         <Link to="/resident/reports/new?category=no-truck" className="ct-btn ct-btn--secondary ct-btn--block res-gap">
-          <TriangleAlert size={15} color="var(--ct-red-600)" /> Report Delayed Truck
+          <TriangleAlert size={15} color="var(--ct-red-600)" /> Truck is late? Tell us
         </Link>
       </section>
 
       <Link to="/resident" className="ct-btn ct-btn--primary ct-btn--block">
-        <House size={16} /> Back to Resident Home
+        <House size={16} /> Back to Home
       </Link>
     </div>
   )

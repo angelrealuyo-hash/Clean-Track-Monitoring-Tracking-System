@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { Bell, Building2, Clock, Database, History, Hash, RotateCcw, Save, SlidersHorizontal, Truck } from 'lucide-react'
+import { Bell, Building2, Phone, Database, History, KeyRound, RotateCcw, Save, SlidersHorizontal, Truck, UserCog } from 'lucide-react'
+import ChangePasswordModal from '../../components/ChangePasswordModal.jsx'
+import AvatarPicker from '../../components/AvatarPicker.jsx'
+import { useAuth } from '../../auth/authContext.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Field from '../../components/Field.jsx'
 import ConfirmModal from '../../components/ConfirmModal.jsx'
@@ -12,11 +15,21 @@ import '../components/AdminPage.css'
 import './SettingsPage.css'
 
 const notificationToggles = [
-  { key: 'notifyDelays', label: 'Truck Delay Alerts', hint: 'Alert the office when the truck is late on its route.' },
-  { key: 'notifyMissedReports', label: 'Missed Collection Alerts', hint: 'Alert the office when a resident reports a missed pickup.' },
-  { key: 'notifyOverflow', label: 'Overflowing Bin Warnings', hint: 'Alert when residents report an overflowing communal bin.' },
-  { key: 'dailyDigest', label: 'Daily Summary Email', hint: 'Send a daily collection summary to the supervisor.' },
-  { key: 'alertSound', label: 'Alert Sound', hint: 'Play a chime for high-priority alerts.' },
+  {
+    key: 'autoProximityAlerts',
+    label: 'Truck Coming Alerts (in-app)',
+    hint: 'When the demo truck heads to a purok, residents there get a message in the Resident app.',
+  },
+  {
+    key: 'autoPickupCheck',
+    label: 'Today’s Pick Up Check (in-app)',
+    hint: 'About an hour before pickup, residents are asked “Are you planning to dispose of your garbage today?”. Their answers feed Reports & Analytics.',
+  },
+  {
+    key: 'autoScheduleReminders',
+    label: 'Pickup Day Reminders (in-app)',
+    hint: 'On pickup days, residents get a “put your garbage bags out” message in the Resident app.',
+  },
 ]
 
 function Section({ icon: Icon, title, subtitle, tag, children }) {
@@ -44,6 +57,18 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState(data.settings)
   const [errors, setErrors] = useState({})
   const [confirmReset, setConfirmReset] = useState(false)
+  const [pwOpen, setPwOpen] = useState(false)
+  const [photoSaving, setPhotoSaving] = useState(false)
+
+  // The profile picture saves right away (separate from Save Changes below).
+  function setPhoto(photo) {
+    setPhotoSaving(true)
+    dispatch({ type: 'admin/setPhoto', payload: { photo } }).then((res) => {
+      setPhotoSaving(false)
+      if (res.ok) toast(photo ? 'Profile picture saved' : 'Profile picture removed')
+    })
+  }
+  const { sessions } = useAuth()
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(data.settings)
   const set = (key, cast = (v) => v) => (e) =>
@@ -51,20 +76,21 @@ export default function SettingsPage() {
 
   function save() {
     const errs = {}
-    if (draft.barangayName.trim().length < 3) errs.barangayName = 'Barangay name is required.'
-    if (!draft.lguCode.trim()) errs.lguCode = 'LGU / district code is required.'
-    if (!draft.operatingStart || !draft.operatingEnd || draft.operatingEnd <= draft.operatingStart) {
-      errs.operatingEnd = 'End time must be after start time.'
-    }
+    const name = draft.barangayName.trim()
+    if (name && name.length < 3) errs.barangayName = 'Use at least 3 characters, or leave it empty.'
+    const phone = (draft.officePhone ?? '').trim()
+    if (phone && !/^\+?[\d\s()-]{7,20}$/.test(phone)) errs.officePhone = 'Use digits, spaces, ( ) - and + only, e.g. (02) 8123 4567.'
     setErrors(errs)
     if (Object.keys(errs).length) {
       toast('Please fix the highlighted fields', 'error')
       return
     }
-    const clean = { ...draft, barangayName: draft.barangayName.trim(), lguCode: draft.lguCode.trim() }
-    dispatch({ type: 'settings/update', payload: clean })
-    setDraft(clean)
-    toast('Settings saved')
+    const clean = { ...draft, barangayName: draft.barangayName.trim(), officePhone: phone }
+    dispatch({ type: 'settings/update', payload: clean }).then((res) => {
+      if (!res.ok) return
+      setDraft(clean)
+      toast('Settings saved')
+    })
   }
 
   function cancel() {
@@ -98,43 +124,72 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <Section icon={Building2} title="1. General Settings" subtitle="Barangay identification and operating hours" tag="Primary">
-        <div className="ct-form-grid">
-          <Field label="Barangay Name" htmlFor="st-name" required error={errors.barangayName} hint="Shown in the Admin header.">
-            <div className="ct-input-group">
-              <Building2 size={16} />
-              <input id="st-name" value={draft.barangayName} onChange={set('barangayName')} aria-invalid={!!errors.barangayName} />
-            </div>
-          </Field>
-          <Field label="Municipal LGU / District Code" htmlFor="st-lgu" required error={errors.lguCode}>
-            <div className="ct-input-group">
-              <Hash size={16} />
-              <input id="st-lgu" value={draft.lguCode} onChange={set('lguCode')} aria-invalid={!!errors.lguCode} />
-            </div>
-          </Field>
-          <Field label="Timezone" htmlFor="st-tz">
-            <select id="st-tz" className="ct-input" value={draft.timezone} onChange={set('timezone')}>
-              <option value="Asia/Manila">Philippine Standard Time (UTC+8)</option>
-            </select>
-          </Field>
-          <div className="ct-form-grid settings-hours">
-            <Field label="Operations Start" htmlFor="st-start">
-              <div className="ct-input-group">
-                <Clock size={16} />
-                <input id="st-start" type="time" value={draft.operatingStart} onChange={set('operatingStart')} />
-              </div>
-            </Field>
-            <Field label="Operations End" htmlFor="st-end" error={errors.operatingEnd}>
-              <div className="ct-input-group">
-                <Clock size={16} />
-                <input id="st-end" type="time" value={draft.operatingEnd} onChange={set('operatingEnd')} aria-invalid={!!errors.operatingEnd} />
-              </div>
-            </Field>
+      <section className="ct-card settings-section">
+        <header className="settings-section__head">
+          <span className="stat-card__icon stat-card__icon--green">
+            <UserCog size={18} />
+          </span>
+          <div>
+            <h2>My Account</h2>
+            <p>Your personal sign-in (separate from the system settings below)</p>
           </div>
+        </header>
+        <div className="settings-section__body settings-account">
+          <div className="settings-account__photo">
+            <span className="ct-label">Profile Picture</span>
+            <AvatarPicker value={data.adminPhoto ?? null} onChange={setPhoto} initials={sessions.admin?.initials ?? 'A'} name={sessions.admin?.name} busy={photoSaving} size={56} />
+          </div>
+          <dl className="settings-account__info">
+            <div>
+              <dt>Name</dt>
+              <dd>{sessions.admin?.name}</dd>
+            </div>
+            <div>
+              <dt>Position</dt>
+              <dd>{sessions.admin?.title}</dd>
+            </div>
+            <div>
+              <dt>Sign-in email</dt>
+              <dd>admin@cleantrack.gov</dd>
+            </div>
+          </dl>
+          <button type="button" className="ct-btn ct-btn--secondary settings-account__btn" onClick={() => setPwOpen(true)}>
+            <KeyRound size={15} /> Change Password
+          </button>
         </div>
+      </section>
+
+      <h2 className="settings-group-title">System Settings</h2>
+
+      <Section icon={Building2} title="1. General" subtitle="The barangay this system serves" tag="Primary">
+        <Field label="Barangay Name (optional)" htmlFor="st-name" error={errors.barangayName} hint="Leave empty to show no barangay name in the apps.">
+          <div className="ct-input-group">
+            <Building2 size={16} />
+            <input id="st-name" value={draft.barangayName} onChange={set('barangayName')} aria-invalid={!!errors.barangayName} />
+          </div>
+        </Field>
+        <Field
+          label="Office Phone for Drivers (optional)"
+          htmlFor="st-phone"
+          error={errors.officePhone}
+          hint="Used by the “Call the Office” button in the Driver app. Leave empty until you have the official number."
+        >
+          <div className="ct-input-group">
+            <Phone size={16} />
+            <input
+              id="st-phone"
+              type="tel"
+              inputMode="tel"
+              placeholder="Not set"
+              value={draft.officePhone ?? ''}
+              onChange={set('officePhone')}
+              aria-invalid={!!errors.officePhone}
+            />
+          </div>
+        </Field>
       </Section>
 
-      <Section icon={Truck} title="2. Collection Preferences" subtitle="Daily targets and how late is “missed”" tag="Rules">
+      <Section icon={Truck} title="2. Collection Target" subtitle="Used on the Dashboard and in Reports & Analytics" tag="Rules">
         <div className="ct-form-grid">
           <div className="settings-box">
             <div className="settings-box__row">
@@ -159,17 +214,6 @@ export default function SettingsPage() {
               <span>100% (strict)</span>
             </div>
           </div>
-          <div className="settings-box">
-            <Field label="Missed Stop Grace Period" htmlFor="st-grace" hint="How long after the planned time a stop counts as late.">
-              <select id="st-grace" className="ct-input" value={draft.missedGraceMinutes} onChange={set('missedGraceMinutes', Number)}>
-                {[10, 15, 30, 60].map((m) => (
-                  <option key={m} value={m}>
-                    {m} minutes after scheduled window
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
         </div>
       </Section>
 
@@ -190,7 +234,7 @@ export default function SettingsPage() {
         </p>
       </Section>
 
-      <Section icon={Bell} title="4. Notification Preferences" subtitle="Saved for when real alerts are connected. This demo does not send emails, SMS or sounds." tag="Preferences">
+      <Section icon={Bell} title="4. Automatic Resident Messages" subtitle="In-app messages only. No email or SMS provider is set up, so nothing is sent outside CleanTrack." tag="In-app">
         <ul className="settings-toggles">
           {notificationToggles.map((t) => (
             <li key={t.key} className="settings-toggle">
@@ -199,7 +243,7 @@ export default function SettingsPage() {
                 <p>{t.hint}</p>
               </div>
               <label className="ct-switch">
-                <input type="checkbox" role="switch" aria-labelledby={`lbl-${t.key}`} checked={draft[t.key]} onChange={set(t.key)} />
+                <input type="checkbox" role="switch" aria-labelledby={`lbl-${t.key}`} checked={Boolean(draft[t.key] ?? defaultSettings[t.key])} onChange={set(t.key)} />
                 <span />
               </label>
             </li>
@@ -207,7 +251,7 @@ export default function SettingsPage() {
         </ul>
       </Section>
 
-      <Section icon={Database} title="5. Demo Data" subtitle="Changes are saved in this browser only (no server)">
+      <Section icon={Database} title="5. Demo Data" subtitle="Restore the starting demo data on the server (for demonstrations)">
         <div className="settings-toggle">
           <div>
             <strong>Reset all demo data</strong>
@@ -238,9 +282,10 @@ export default function SettingsPage() {
             toast('Demo data reset')
           }}
         >
-          <p>This removes every change made in this browser: edited truck and drivers, report responses, broadcasts, collection results and settings.</p>
+          <p>This replaces ALL data in the CleanTrack database with the starting demo data: truck, drivers, route, schedule, reports, notifications, collection runs, settings and resident accounts. Only use it for demonstrations.</p>
         </ConfirmModal>
       )}
+      {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
     </div>
   )
 }

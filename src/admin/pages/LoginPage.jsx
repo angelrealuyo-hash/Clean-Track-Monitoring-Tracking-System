@@ -11,7 +11,7 @@ import {
   Send,
   User,
 } from 'lucide-react'
-import Logo from '../../components/Logo.jsx'
+import logoUrl from '../../assets/cleantrack-logo.png'
 import Modal from '../../components/Modal.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useAuth } from '../../auth/authContext.js'
@@ -32,6 +32,7 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [autoFilled, setAutoFilled] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const [forgotOpen, setForgotOpen] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
@@ -47,14 +48,19 @@ export default function LoginPage() {
     setAutoFilled(true)
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    const res = await login('admin', email, password, remember)
+    setBusy(false)
     // On success, the redirect at the top of this component takes over.
-    if (!login('admin', email, password, remember)) {
+    if (!res.ok) {
       setAutoFilled(false)
-      setError('Incorrect email or password. Use Auto Fill to load the demo account.')
+      setError(res.error || 'Incorrect email or password.')
     }
   }
+
 
   function closeForgot() {
     setForgotOpen(false)
@@ -63,21 +69,23 @@ export default function LoginPage() {
 
   return (
     <div className="admin-login">
-      <header className="admin-login__bar">
-        <Logo size={26} />
-        <strong>CleanTrack</strong>
-        <span className="admin-login__bar-sep">/</span>
-        <span>{barangay.name} Solid Waste Office</span>
-        <div className="admin-login__bar-right">
-          <StatusBadge tone="green">Simulated Demo Mode</StatusBadge>
+      {/* Left: branding */}
+      <section className="admin-login__hero" aria-label="CleanTrack">
+        <div className="admin-login__hero-inner">
+          <img className="admin-login__logo" src={logoUrl} alt="CleanTrack logo" />
+          <h1>CleanTrack</h1>
+          <p className="admin-login__tagline">Cleaner communities, one pickup at a time.</p>
+          <p className="admin-login__sub">Track the garbage truck, follow every route, and hear from residents in one place.</p>
         </div>
-      </header>
+        <p className="admin-login__hero-foot">{barangay.lgu}</p>
+      </section>
 
-      <main className="admin-login__body">
-        <form className="admin-login__card" onSubmit={handleSubmit}>
-          <div className="admin-login__brand">
-            <Logo size={52} />
-            <h1>CleanTrack</h1>
+      {/* Right: sign in */}
+      <main className="admin-login__panel">
+        <form className="admin-login__card" onSubmit={handleSubmit} aria-labelledby="admin-login-title" aria-busy={busy}>
+          <div className="admin-login__head">
+            <StatusBadge tone="green">Simulated Demo Mode</StatusBadge>
+            <h2 id="admin-login-title">Admin Sign In</h2>
             <p>Barangay Waste Management Portal</p>
           </div>
 
@@ -89,7 +97,9 @@ export default function LoginPage() {
           )}
           {error && (
             <div className="ct-alert ct-alert--error" role="alert">
-              {error}
+              <span>
+                <strong>Sign-in failed.</strong> {error}
+              </span>
             </div>
           )}
 
@@ -163,21 +173,20 @@ export default function LoginPage() {
             Remember this computer
           </label>
 
-          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block">
-            <LogIn size={16} />
-            Sign In
+          <button type="submit" className="ct-btn ct-btn--primary ct-btn--block admin-login__submit" disabled={busy}>
+            {busy ? <span className="admin-login__spinner" aria-hidden="true" /> : <LogIn size={16} />}
+            {busy ? 'Signing in…' : 'Sign In'}
           </button>
 
           <p className="admin-login__help">
             Need assistance? Call the Barangay Office at <strong>{barangay.hotline}</strong>
           </p>
         </form>
+        <footer className="admin-login__footer">
+          <span>© 2025 CleanTrack</span>
+          <span>Student project prototype · All truck locations are simulated</span>
+        </footer>
       </main>
-
-      <footer className="admin-login__footer">
-        <span>© 2025 CleanTrack · {barangay.name}</span>
-        <span>Student project prototype · All truck locations are simulated</span>
-      </footer>
 
       {forgotOpen && (
         <Modal

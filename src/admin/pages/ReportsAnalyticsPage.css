@@ -19,3 +19,75 @@
   background: var(--ct-green-50);
   border-top: 2px solid var(--ct-border);
 }
+
+.analytics-gap {
+  margin-bottom: 16px;
+}
+
+/* ---------- Resident collection participation ---------- */
+.feedback-analytics {
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ct-border);
+}
+
+.fa-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.fa-head h2 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-family: var(--ct-font-heading);
+  font-size: 18px;
+  color: var(--ct-green-900);
+}
+
+.fa-head p {
+  max-width: 560px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--ct-text-muted);
+}
+
+.fa-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--ct-text-muted);
+}
+
+.fa-filters .ct-input {
+  width: auto;
+}
+
+.fa-src {
+  display: block;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--ct-text-muted);
+}
+
+.fa-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fa-bars h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feedback-analytics .ct-alert .status-badge {
+  vertical-align: middle;
+}

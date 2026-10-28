@@ -123,7 +123,7 @@ export default function TrackingMap({ route, state, progress, focusRequest, truc
                 <strong>{stop.name}</strong>
                 <br />
                 {stop.purok} · {stopStatusLabels[status]}
-                {stop.bins > 0 && ` · ${stop.bins} bins`}
+                {stop.households > 0 && ` · ${stop.households} households`}
               </Tooltip>
             </CircleMarker>
           )

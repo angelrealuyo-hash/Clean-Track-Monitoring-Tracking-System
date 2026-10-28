@@ -1,9 +1,10 @@
 import { Suspense, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, LogOut, Menu, X } from 'lucide-react'
+import { Bell, LogOut, Menu, Settings, X } from 'lucide-react'
 import Logo from '../../components/Logo.jsx'
 import PageLoader from '../../components/PageLoader.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
+import Avatar from '../../components/Avatar.jsx'
 import { useAuth } from '../../auth/authContext.js'
 import { demoUsers } from '../../data/users.js'
 import { useData } from '../../store/dataContext.js'
@@ -84,13 +85,21 @@ export default function AdminLayout() {
           </button>
         </nav>
 
-        <div className="admin-profile">
-          <span className="admin-avatar">{user.initials}</span>
+        {/* Profile opens Settings (My Account is the first section there). */}
+        <Link
+          to="/admin/settings"
+          className="admin-profile"
+          onClick={() => setMenuOpen(false)}
+          aria-label={`${user.name}, open Settings`}
+          title="Open Settings"
+        >
+          <Avatar photo={data.adminPhoto} initials={user.initials} className="admin-avatar" />
           <div>
             <strong>{user.name}</strong>
             <span>{user.title}</span>
           </div>
-        </div>
+          <Settings size={16} className="admin-profile__icon" aria-hidden="true" />
+        </Link>
       </aside>
 
       <div className="admin-backdrop" onClick={() => setMenuOpen(false)} />
@@ -108,7 +117,7 @@ export default function AdminLayout() {
           <nav className="admin-breadcrumb" aria-label="Breadcrumb">
             <span>CleanTrack</span>
             <span className="admin-breadcrumb__sep">/</span>
-            <span>{data.settings.barangayName}</span>
+            <span>{data.settings.barangayName || 'Barangay'}</span>
             <span className="admin-breadcrumb__sep">/</span>
             <strong>{current?.label ?? 'Admin'}</strong>
           </nav>
@@ -118,9 +127,9 @@ export default function AdminLayout() {
               <Bell size={20} />
               {unreadAdmin > 0 && <span className="admin-topbar__dot" />}
             </Link>
-            <span className="admin-avatar admin-avatar--small" title={user.name}>
-              {user.initials}
-            </span>
+            <Link to="/admin/settings" className="admin-avatar--link" title={`${user.name} · Settings`} aria-label={`${user.name}, open Settings`}>
+              <Avatar photo={data.adminPhoto} initials={user.initials} className="admin-avatar admin-avatar--small" />
+            </Link>
           </div>
         </header>
         <main className="admin-content">

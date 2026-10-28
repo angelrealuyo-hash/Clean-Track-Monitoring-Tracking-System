@@ -1,24 +1,39 @@
 // Read-only helpers that combine store data with the simulation.
 import { isCollectionStop } from '../services/trackingSimulation.js'
 
-// A stop's status for today. A result the admin set by hand (Collection
-// Monitoring) wins over the simulation.
-// 'collected' | 'missed' | 'next' | 'pending' | 'depot'
-export function getStopStatus(stop, progress, collectionLog) {
-  const manual = collectionLog[stop.id]
-  if (manual) return manual.status
+export { currentRun } from './dataReducer.js'
+
+// A stop's status: collected/missed from the saved records, "next" from the
+// simulated truck. (progress = getRouteProgress(route, sim, results))
+export function getStopStatus(stop, progress) {
   return progress ? progress.statusOf(stop) : 'pending'
 }
 
-export function getCollectionSummary(route, progress, collectionLog) {
+export function getCollectionSummary(route, progress) {
   const stops = route.stops.filter(isCollectionStop)
   const counts = { collected: 0, missed: 0, next: 0, pending: 0 }
-  for (const stop of stops) counts[getStopStatus(stop, progress, collectionLog)] += 1
+  for (const stop of stops) counts[getStopStatus(stop, progress)] += 1
   const total = stops.length
   return {
     total,
     ...counts,
     percent: total ? Math.round((counts.collected / total) * 100) : 0,
+  }
+}
+
+// Summary of one saved run (history / analytics).
+export function summarizeRun(run) {
+  const results = Object.values(run.results)
+  const total = run.stops.length
+  const collected = results.filter((r) => r.status === 'collected').length
+  const missed = results.filter((r) => r.status === 'missed').length
+  return {
+    total,
+    collected,
+    missed,
+    notDone: total - collected - missed,
+    percent: total ? Math.round((collected / total) * 100) : 0,
+    households: run.stops.filter((s) => run.results[s.id]?.status === 'collected').reduce((n, s) => n + s.households, 0),
   }
 }
 
@@ -31,8 +46,8 @@ export const stopStatusMeta = {
 }
 
 export const reportStatusMeta = {
-  submitted: { tone: 'red', label: 'New' },
-  'in-progress': { tone: 'amber', label: 'In progress' },
+  submitted: { tone: 'red', label: 'Submitted' },
+  'in-progress': { tone: 'amber', label: 'Reviewing' },
   resolved: { tone: 'green', label: 'Resolved' },
 }
 
@@ -61,6 +76,9 @@ export function notificationsForResident(notifications, resident) {
   if (!resident) return []
   return notifications.filter((n) => {
     if (n.audience !== 'resident') return false
+    // Automatic messages the resident turned off in Profile.
+    if (n.kind === 'proximity' && resident.prefs?.truckNearby === false) return false
+    if (n.kind === 'schedule' && resident.prefs?.scheduleReminders === false) return false
     if (n.residentId) return n.residentId === resident.id
     if (n.zone) return n.zone === 'All Puroks' || n.zone === resident.purok
     return true
@@ -80,4 +98,63 @@ export function truckDistanceToPurok(route, sim, purok) {
   }
   const stopsAway = index - sim.legIndex - 1 // stops still to visit before this one
   return { state: stopsAway === 0 ? 'here' : 'approaching', stopsAway, stop }
+}
+
+// ---------- Resident pickup feedback (what residents SAID) ----------
+// feedback: collectionFeedback records (one per resident per date, so nobody
+// is counted twice for the same day). from/to: 'YYYY-MM-DD' (inclusive, optional).
+export function summarizeFeedback(feedback, { from = '', to = '' } = {}) {
+  const inRange = (date) => (!from || date >= from) && (!to || date <= to)
+  const rows = (feedback ?? []).filter((f) => inRange(f.date))
+  const pct = (part, whole) => (whole ? Math.round((part / whole) * 100) : null)
+  const count = (fn) => rows.filter(fn).length
+
+  const willYes = count((f) => f.willDispose)
+  const willNo = rows.length - willYes
+  const passedYes = count((f) => f.willDispose && f.truckPassed === true)
+  const passedNo = count((f) => f.willDispose && f.truckPassed === false)
+  const passedUnanswered = willYes - passedYes - passedNo
+  const disposedYes = count((f) => f.disposed === true)
+  const disposedNo = count((f) => f.disposed === false)
+  const disposedUnanswered = willYes - disposedYes - disposedNo
+
+  const reasons = {}
+  for (const f of rows) if (f.reason) reasons[f.reason] = (reasons[f.reason] ?? 0) + 1
+
+  return {
+    rows,
+    responses: rows.length,
+    residents: new Set(rows.map((f) => f.residentId)).size,
+    days: new Set(rows.map((f) => f.date)).size,
+    willYes,
+    willNo,
+    passedYes,
+    passedNo,
+    passedUnanswered,
+    disposedYes,
+    disposedNo,
+    disposedUnanswered,
+    reasons,
+    percent: {
+      willYes: pct(willYes, rows.length),
+      passedYes: pct(passedYes, passedYes + passedNo),
+      disposedYes: pct(disposedYes, disposedYes + disposedNo),
+    },
+  }
+}
+
+// Driver-confirmed pickups (saved stop records) for the same dates.
+export function summarizeRunsInRange(runs, { from = '', to = '' } = {}) {
+  const list = (runs ?? []).filter((r) => (!from || r.date >= from) && (!to || r.date <= to))
+  const totals = { runs: list.length, stops: 0, collected: 0, missed: 0, households: 0, completedRuns: 0 }
+  for (const run of list) {
+    const s = summarizeRun(run)
+    totals.stops += s.total
+    totals.collected += s.collected
+    totals.missed += s.missed
+    totals.households += s.households
+    if (run.status === 'completed') totals.completedRuns += 1
+  }
+  totals.percent = totals.stops ? Math.round((totals.collected / totals.stops) * 100) : null
+  return totals
 }

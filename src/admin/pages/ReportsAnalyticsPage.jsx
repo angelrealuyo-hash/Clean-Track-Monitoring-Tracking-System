@@ -1,84 +1,98 @@
-import { CircleCheck, ClipboardList, Download, Info, MapPin, Target, TriangleAlert } from 'lucide-react'
+import { CircleCheck, ClipboardList, Download, History, Info, MapPin, Target, TriangleAlert } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
 import BarList from '../components/charts/BarList.jsx'
 import StatusBar from '../components/charts/StatusBar.jsx'
+import StatusBadge from '../../components/StatusBadge.jsx'
+import FeedbackAnalytics from '../components/FeedbackAnalytics.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { useToast } from '../../components/toast/toastContext.js'
-import { getCollectionSummary, getStopStatus } from '../../store/selectors.js'
-import { isCollectionStop } from '../../services/trackingSimulation.js'
+import { getCollectionSummary, summarizeRun } from '../../store/selectors.js'
 import { reportCategories } from '../../data/reports.js'
 import { downloadCsv } from '../../utils/csv.js'
-import { todayISO } from '../../utils/format.js'
+import { formatDate, formatTime, todayISO } from '../../utils/format.js'
 import '../components/AdminPage.css'
 import './ReportsAnalyticsPage.css'
 
-// PDF pages 30-31. Only figures that can be computed from data CleanTrack
-// actually has (today's route + reports). No invented weekly history.
+const runStatus = {
+  'in-progress': ['amber', 'In progress'],
+  completed: ['green', 'Completed'],
+  'ended-early': ['red', 'Ended early'],
+}
+
+// PDF pages 30-31. Every figure is computed from records saved by the app:
+// collection runs (driver/office stop records) and resident reports.
 export default function ReportsAnalyticsPage() {
   const { data } = useData()
-  const { progress } = useTracking()
+  const { route, progress } = useTracking()
   const toast = useToast()
-  const { route, reports, collectionLog, settings } = data
+  const { runs, reports, settings } = data
 
-  const summary = getCollectionSummary(route, progress, collectionLog)
-  const metTarget = summary.percent >= settings.completionTarget
+  const history = runs.map((run) => ({ run, ...summarizeRun(run) })) // newest first
+  const recorded = history.filter((h) => h.collected + h.missed > 0)
+  const avgCompletion = recorded.length ? Math.round(recorded.reduce((n, h) => n + h.percent, 0) / recorded.length) : null
+  const totalCollected = history.reduce((n, h) => n + h.collected, 0)
+  const totalMissed = history.reduce((n, h) => n + h.missed, 0)
   const resolved = reports.filter((r) => r.status === 'resolved').length
   const resolution = reports.length ? Math.round((resolved / reports.length) * 100) : 0
+  const today = getCollectionSummary(route, progress)
+
+  const trend = history
+    .slice(0, 7)
+    .reverse()
+    .map((h) => ({ label: `${formatDate(h.run.date)} · ${h.run.id.split('-').pop()}`, value: h.percent, detail: `${h.collected} of ${h.total} collected` }))
 
   const byCategory = reportCategories
     .map((c) => {
       const inCat = reports.filter((r) => r.category === c.id)
-      const open = inCat.filter((r) => r.status !== 'resolved').length
-      return { label: c.label, value: inCat.length, detail: `${open} open` }
+      return { label: c.label, value: inCat.length, detail: `${inCat.filter((r) => r.status !== 'resolved').length} open` }
     })
     .filter((c) => c.value > 0)
     .sort((a, b) => b.value - a.value)
 
-  // Per-purok breakdown of today's stops.
-  const stops = route.stops.filter(isCollectionStop)
-  const puroks = [...new Set(stops.map((s) => s.purok))].map((purok) => {
-    const inPurok = stops.filter((s) => s.purok === purok)
-    const st = inPurok.map((s) => getStopStatus(s, progress, collectionLog))
-    const collected = st.filter((x) => x === 'collected').length
-    const missed = st.filter((x) => x === 'missed').length
-    return {
-      purok,
-      stops: inPurok.length,
-      bins: inPurok.reduce((n, s) => n + s.bins, 0),
-      collected,
-      missed,
-      pending: inPurok.length - collected - missed,
-      percent: Math.round((collected / inPurok.length) * 100),
-      reports: reports.filter((r) => r.location.includes(purok)).length,
+  // Per purok, across all saved runs.
+  const puroks = {}
+  for (const { run } of history) {
+    for (const stop of run.stops) {
+      const p = (puroks[stop.purok] ??= { purok: stop.purok, collected: 0, missed: 0, notDone: 0 })
+      const r = run.results[stop.id]?.status
+      if (r === 'collected') p.collected += 1
+      else if (r === 'missed') p.missed += 1
+      else if (run.endedAt) p.notDone += 1
     }
-  })
-  const totals = puroks.reduce(
-    (t, p) => ({ stops: t.stops + p.stops, bins: t.bins + p.bins, collected: t.collected + p.collected, missed: t.missed + p.missed, pending: t.pending + p.pending }),
-    { stops: 0, bins: 0, collected: 0, missed: 0, pending: 0 },
-  )
+  }
+  const purokRows = Object.values(puroks).sort((a, b) => a.purok.localeCompare(b.purok))
 
   function exportCsv() {
     downloadCsv(
-      `cleantrack-summary-${todayISO()}.csv`,
-      ['Purok', 'Stops', 'Bins', 'Collected', 'Missed', 'Pending', 'Completion %', 'Resident reports'],
-      [
-        ...puroks.map((p) => [p.purok, p.stops, p.bins, p.collected, p.missed, p.pending, p.percent, p.reports]),
-        ['Barangay total', totals.stops, totals.bins, totals.collected, totals.missed, totals.pending, summary.percent, reports.length],
-      ],
+      `cleantrack-collection-runs-${todayISO()}.csv`,
+      ['Run', 'Date', 'Driver', 'Started', 'Ended', 'Pickup points', 'Collected', 'Missed', 'Not done', 'Completion %', 'Status'],
+      history.map((h) => [
+        h.run.id,
+        h.run.date,
+        h.run.driverName,
+        new Date(h.run.startedAt).toLocaleString('en-PH'),
+        h.run.endedAt ? new Date(h.run.endedAt).toLocaleString('en-PH') : '',
+        h.total,
+        h.collected,
+        h.missed,
+        h.notDone,
+        h.percent,
+        runStatus[h.run.status][1],
+      ]),
     )
-    toast('Summary report exported')
+    toast('Collection run history exported')
   }
 
   return (
     <div className="admin-page">
       <PageHeader
         title="Reports & Analytics"
-        badge="Today's Summary"
-        subtitle="Collection completion and resident feedback for the barangay"
+        badge="From saved records"
+        subtitle="Collection results and resident feedback for the barangay"
         actions={
-          <button type="button" className="ct-btn ct-btn--primary" onClick={exportCsv}>
+          <button type="button" className="ct-btn ct-btn--primary" onClick={exportCsv} disabled={history.length === 0}>
             <Download size={16} /> Export CSV Report
           </button>
         }
@@ -87,26 +101,25 @@ export default function ReportsAnalyticsPage() {
       <div className="ct-alert">
         <Info size={16} />
         <span>
-          CleanTrack does not keep collection history yet, so these figures cover <strong>today only</strong>,
-          from the simulated route and the results recorded in Collection Monitoring. Weekly and monthly trends need a
-          database (future work).
+          Built from <strong>{runs.length}</strong> saved collection run{runs.length === 1 ? '' : 's'} and{' '}
+          <strong>{reports.length}</strong> resident reports saved in the CleanTrack database, plus{' '}
+          <strong>{(data.collectionFeedback ?? []).length}</strong> resident pickup answers (see Resident Collection Participation below). A run is saved each time the driver taps Start
+          Route. Truck positions are simulated; stop results are what the driver or office recorded.
         </span>
       </div>
 
       <section className="ct-stats" aria-label="Key figures">
-        <StatCard label="Collection Completion" icon={Target} value={`${summary.percent}%`} highlight>
-          <div className="ct-progress">
-            <span style={{ width: `${summary.percent}%` }} />
-          </div>
+        <StatCard label="Average Completion" icon={Target} value={avgCompletion === null ? '—' : `${avgCompletion}%`} highlight>
           <span>
-            Target {settings.completionTarget}% · {metTarget ? <b>target met</b> : 'not yet met'}
+            Target {settings.completionTarget}% ·{' '}
+            {avgCompletion === null ? 'no recorded runs yet' : avgCompletion >= settings.completionTarget ? <b>target met</b> : 'below target'}
           </span>
         </StatCard>
-        <StatCard label="Completed Stops" icon={CircleCheck} value={summary.collected} unit={`of ${summary.total}`}>
-          <span>{totals.bins} bins on the route</span>
+        <StatCard label="Pickups Recorded" icon={CircleCheck} value={totalCollected} unit="collected">
+          <span>Across {runs.length} run(s)</span>
         </StatCard>
-        <StatCard label="Missed Stops" icon={TriangleAlert} value={summary.missed} unit="stops" tone="amber">
-          <span>{summary.missed ? 'Flagged for a return trip' : 'None recorded today'}</span>
+        <StatCard label="Missed Pickups" icon={TriangleAlert} value={totalMissed} unit="missed" tone="amber">
+          <span>Reported by driver or office</span>
         </StatCard>
         <StatCard label="Resident Reports" icon={ClipboardList} value={reports.length} unit="reports">
           <span>
@@ -119,21 +132,16 @@ export default function ReportsAnalyticsPage() {
         <article className="ct-card">
           <div className="ct-card__header">
             <div>
-              <h2>Today&apos;s Stop Status</h2>
-              <p>{summary.total} collection stops on {route.shortName}</p>
+              <h2>Completion per Run</h2>
+              <p>Last {trend.length || 0} collection run(s), % of pickup points collected</p>
             </div>
           </div>
           <div className="ct-card__body">
-            <StatusBar
-              label="Stops by status"
-              total={summary.total}
-              segments={[
-                { key: 'collected', label: 'Collected', value: summary.collected },
-                { key: 'next', label: 'Next stop', value: summary.next },
-                { key: 'pending', label: 'Pending', value: summary.pending },
-                { key: 'missed', label: 'Missed', value: summary.missed },
-              ]}
-            />
+            {trend.length ? (
+              <BarList items={trend} unit="%" max={100} label="Completion per run" />
+            ) : (
+              <p className="ct-empty">No collection runs yet. Start a route in the Driver app to record one.</p>
+            )}
           </div>
         </article>
 
@@ -152,70 +160,129 @@ export default function ReportsAnalyticsPage() {
         </article>
       </div>
 
-      <article className="ct-card">
+      <article className="ct-card analytics-gap">
         <div className="ct-card__header">
           <div>
-            <h2>Collection by Purok</h2>
-            <p>Printable summary for barangay reporting</p>
+            <h2>Current Run: Pickup Point Status</h2>
+            <p>{today.total} pickup points on {route.shortName}</p>
           </div>
         </div>
         <div className="ct-card__body">
-          <div className="ct-table-wrap">
-            <table className="ct-table analytics-table">
-              <thead>
-                <tr>
-                  <th>Purok</th>
-                  <th className="is-right">Stops</th>
-                  <th className="is-right">Bins</th>
-                  <th className="is-right">Collected</th>
-                  <th className="is-right">Missed</th>
-                  <th className="is-right">Pending</th>
-                  <th className="is-right">Completion</th>
-                  <th className="is-right">Reports</th>
-                </tr>
-              </thead>
-              <tbody>
-                {puroks.map((p) => (
-                  <tr key={p.purok}>
-                    <td>
-                      <MapPin size={13} /> <strong>{p.purok}</strong>
-                    </td>
-                    <td className="is-right">{p.stops}</td>
-                    <td className="is-right">{p.bins}</td>
-                    <td className="is-right is-green">{p.collected}</td>
-                    <td className={`is-right ${p.missed ? 'is-red' : ''}`}>{p.missed}</td>
-                    <td className="is-right">{p.pending}</td>
-                    <td className="is-right">
-                      <strong>{p.percent}%</strong>
-                    </td>
-                    <td className="is-right">{p.reports}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>
-                    <strong>Barangay Total</strong>
-                  </td>
-                  <td className="is-right">{totals.stops}</td>
-                  <td className="is-right">{totals.bins}</td>
-                  <td className="is-right is-green">{totals.collected}</td>
-                  <td className="is-right">{totals.missed}</td>
-                  <td className="is-right">{totals.pending}</td>
-                  <td className="is-right">
-                    <strong>{summary.percent}%</strong>
-                  </td>
-                  <td className="is-right">{reports.length}</td>
-                </tr>
-              </tfoot>
-            </table>
+          <StatusBar
+            label="Pickup points by status"
+            total={today.total}
+            segments={[
+              { key: 'collected', label: 'Collected', value: today.collected },
+              { key: 'next', label: 'Truck heading there', value: today.next },
+              { key: 'pending', label: 'Not yet', value: today.pending },
+              { key: 'missed', label: 'Missed', value: today.missed },
+            ]}
+          />
+        </div>
+      </article>
+
+      <article className="ct-card analytics-gap">
+        <div className="ct-card__header">
+          <div>
+            <h2>
+              <History size={16} /> Collection Run History
+            </h2>
+            <p>Every saved run, newest first</p>
           </div>
+        </div>
+        <div className="ct-card__body">
+          {history.length === 0 ? (
+            <p className="ct-empty">No runs saved yet.</p>
+          ) : (
+            <div className="ct-table-wrap">
+              <table className="ct-table analytics-table">
+                <thead>
+                  <tr>
+                    <th>Date / Run</th>
+                    <th>Driver</th>
+                    <th>Time</th>
+                    <th className="is-right">Collected</th>
+                    <th className="is-right">Missed</th>
+                    <th className="is-right">Not done</th>
+                    <th className="is-right">Completion</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.run.id}>
+                      <td>
+                        <strong>{formatDate(h.run.date)}</strong>
+                        <small className="ct-mono">{h.run.id}</small>
+                        {h.run.special && <small>Special (not Mon/Wed/Fri)</small>}
+                      </td>
+                      <td>{h.run.driverName}</td>
+                      <td>
+                        {formatTime(h.run.startedAt)} – {h.run.endedAt ? formatTime(h.run.endedAt) : 'now'}
+                      </td>
+                      <td className="is-right is-green">{h.collected}</td>
+                      <td className={`is-right ${h.missed ? 'is-red' : ''}`}>{h.missed}</td>
+                      <td className="is-right">{h.notDone}</td>
+                      <td className="is-right">
+                        <strong>{h.percent}%</strong>
+                      </td>
+                      <td>
+                        <StatusBadge tone={runStatus[h.run.status][0]}>{runStatus[h.run.status][1]}</StatusBadge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </article>
+
+      <article className="ct-card">
+        <div className="ct-card__header">
+          <div>
+            <h2>Results by Purok</h2>
+            <p>All saved runs combined</p>
+          </div>
+        </div>
+        <div className="ct-card__body">
+          {purokRows.length === 0 ? (
+            <p className="ct-empty">No results yet.</p>
+          ) : (
+            <div className="ct-table-wrap">
+              <table className="ct-table analytics-table">
+                <thead>
+                  <tr>
+                    <th>Purok</th>
+                    <th className="is-right">Collected</th>
+                    <th className="is-right">Missed</th>
+                    <th className="is-right">Not done (run ended)</th>
+                    <th className="is-right">Resident reports</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purokRows.map((p) => (
+                    <tr key={p.purok}>
+                      <td>
+                        <MapPin size={13} /> <strong>{p.purok}</strong>
+                      </td>
+                      <td className="is-right is-green">{p.collected}</td>
+                      <td className={`is-right ${p.missed ? 'is-red' : ''}`}>{p.missed}</td>
+                      <td className="is-right">{p.notDone}</td>
+                      <td className="is-right">{reports.filter((r) => r.location.includes(p.purok)).length}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
         <div className="ct-table__foot">
           <span>Reports are matched to a purok by the location the resident entered.</span>
-          <span>Truck positions are simulated (demo).</span>
         </div>
       </article>
+
+      <FeedbackAnalytics feedback={data.collectionFeedback ?? []} runs={runs} residentCount={data.residents.length} />
     </div>
   )
 }

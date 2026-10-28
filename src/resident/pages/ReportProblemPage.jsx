@@ -7,7 +7,7 @@ import { useData } from '../../store/dataContext.js'
 import { useResident } from '../../auth/useAccount.js'
 import { useToast } from '../../components/toast/toastContext.js'
 import { reportCategories } from '../../data/reports.js'
-import { nextId } from '../../store/dataReducer.js'
+import { plainProblem } from '../../data/plainWords.js'
 import './ResidentPages.css'
 
 const icons = { missed: ClipboardX, 'no-truck': Truck, spillage: TriangleAlert, overflow: Trash2, other: CircleHelp }
@@ -29,37 +29,43 @@ export default function ReportProblemPage() {
     smsUpdates: true,
   })
   const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
   const set = (key) => (e) => {
     setErrors((er) => ({ ...er, [key]: undefined })) // clear the field's error as they fix it
     setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
     const errs = {}
     if (form.location.trim().length < 5) errs.location = 'Tell us where the problem is.'
-    if (form.description.trim().length < 10) errs.description = 'Describe what happened (at least 10 characters).'
     setErrors(errs)
     if (Object.keys(errs).length) return
-    const id = nextId(`REP-${new Date().getFullYear()}`, data.reports, 3)
+    if (busy) return
+    setBusy(true)
     const category = reportCategories.find((c) => c.id === form.category)
-    dispatch({
+    const before = new Set(data.reports.map((r) => r.id))
+    const res = await dispatch({
       type: 'report/add',
       payload: {
-        id,
         residentId: resident.id,
         residentName: resident.name,
         residentPhone: resident.phone,
         category: form.category,
         categoryLabel: category.label,
         location: form.location.trim(),
-        description: form.description.trim(),
+        // Optional: a missed collection needs no explanation.
+        description: form.description.trim() || `${plainProblem[form.category].label}.`,
         photo: form.photo,
         smsUpdates: form.smsUpdates,
       },
     })
-    toast(`Report ${id} sent to the barangay`)
-    navigate(`/resident/reports/${id}`, { replace: true })
+    setBusy(false)
+    if (!res.ok) return // the reason is shown as a message
+    // The server assigns the report number.
+    const created = res.data.reports.find((r) => !before.has(r.id))
+    toast(`Report ${created?.id ?? ''} sent to the barangay`)
+    navigate(created ? `/resident/reports/${created.id}` : '/resident/reports', { replace: true })
   }
 
   return (
@@ -70,7 +76,7 @@ export default function ReportProblemPage() {
         </Link>
         <div className="m-grow">
           <h1>Report a Problem</h1>
-          <p>Solid waste concern for the barangay</p>
+          <p>Tell the Barangay about a garbage problem</p>
         </div>
       </header>
 
@@ -79,16 +85,16 @@ export default function ReportProblemPage() {
           <Recycle size={16} />
         </span>
         <div className="m-grow">
-          <p className="m-eyebrow">{data.settings.barangayName}</p>
-          <p className="m-muted">Reports go straight to the barangay solid waste office.</p>
+          <p className="m-eyebrow">Barangay office</p>
+          <p className="m-muted">Your report goes straight to the Barangay office.</p>
         </div>
       </section>
 
       <div className="m-row m-row--between">
-        <h2 className="m-section-title">Select Incident Category</h2>
-        <span className="m-muted">Required *</span>
+        <h2 className="m-section-title">What is the problem?</h2>
+        <span className="m-muted">Choose one</span>
       </div>
-      <div className="ct-options" role="radiogroup" aria-label="Incident category">
+      <div className="ct-options" role="radiogroup" aria-label="What is the problem">
         {reportCategories.map((c) => {
           const Icon = icons[c.id]
           return (
@@ -97,8 +103,8 @@ export default function ReportProblemPage() {
                 <Icon size={16} />
               </span>
               <span className="m-grow">
-                <strong>{c.label}</strong>
-                <small>{c.hint}</small>
+                <strong>{plainProblem[c.id].label}</strong>
+                <small>{plainProblem[c.id].hint}</small>
               </span>
               <input type="radio" name="category" value={c.id} checked={form.category === c.id} onChange={set('category')} />
             </label>
@@ -107,42 +113,42 @@ export default function ReportProblemPage() {
       </div>
 
       <section className="m-card">
-        <h2 className="m-section-title">Incident Details</h2>
+        <h2 className="m-section-title">Tell us more</h2>
         <div className="res-gap">
-          <Field label="Location" htmlFor="rp-loc" required error={errors.location} hint="Filled in from your profile; change it if needed.">
+          <Field label="Where?" htmlFor="rp-loc" required error={errors.location} hint="We filled in your address. Change it if needed.">
             <div className="ct-input-group">
               <MapPin size={16} />
               <input id="rp-loc" value={form.location} onChange={set('location')} aria-invalid={!!errors.location} />
             </div>
           </Field>
-          <Field label="Description" htmlFor="rp-desc" required error={errors.description}>
+          <Field label="What happened? (optional)" htmlFor="rp-desc" error={errors.description}>
             <span className="res-counter">{form.description.length}/250</span>
             <textarea
               id="rp-desc"
               className="ct-input"
               maxLength={250}
-              placeholder="e.g. The truck passed our corner at 8:30 AM without collecting our green bin."
+              placeholder="Example: The truck passed our street this morning but did not take our trash."
               value={form.description}
               onChange={set('description')}
               aria-invalid={!!errors.description}
             />
           </Field>
           <div className="ct-field">
-            <span className="ct-label">Evidence Photo (optional)</span>
+            <span className="ct-label">Photo (optional)</span>
             <PhotoPicker value={form.photo} onChange={(photo) => setForm((f) => ({ ...f, photo }))} />
           </div>
           <label className="ct-checkbox">
             <input type="checkbox" checked={form.smsUpdates} onChange={set('smsUpdates')} />
-            Send me updates on this report ({resident.phone})
+            Show updates about this report in my Messages
           </label>
         </div>
       </section>
 
-      <button type="submit" className="ct-btn ct-btn--primary ct-btn--block">
-        <Send size={16} /> Submit Report to Barangay
+      <button type="submit" className="ct-btn ct-btn--primary ct-btn--block" disabled={busy}>
+        <Send size={16} /> {busy ? 'Sending…' : 'Send to Barangay'}
       </button>
       <Link to="/resident" className="ct-btn ct-btn--secondary ct-btn--block">
-        Cancel &amp; Return to Home
+        Cancel
       </Link>
     </form>
   )

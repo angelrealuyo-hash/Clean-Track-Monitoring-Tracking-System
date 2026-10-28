@@ -143,3 +143,71 @@
     padding-inline: 16px;
   }
 }
+
+.settings-group-title {
+  margin: 8px 2px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ct-text-muted);
+}
+
+/* ---------- My Account ---------- */
+.settings-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-account__photo {
+  flex-basis: 100%;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ct-border);
+}
+
+.settings-account__photo .ct-label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.settings-account__info {
+  display: grid;
+  flex: 1 1 320px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 20px;
+  min-width: 0;
+  margin: 0;
+}
+
+.settings-account__info dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ct-text-muted);
+}
+
+.settings-account__info dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.settings-account__btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .settings-account__info {
+    flex-basis: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-account__btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

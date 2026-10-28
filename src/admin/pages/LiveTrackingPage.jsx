@@ -6,10 +6,12 @@ import ErrorBoundary from '../../components/ErrorBoundary.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import SimulationControls from '../components/SimulationControls.jsx'
 import RouteProgressModal from '../components/RouteProgressModal.jsx'
+import LocationLogCard from '../components/LocationLogCard.jsx'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { STATUS_LABELS, STATUS_TONES } from '../../services/trackingSimulation.js'
 import { useData } from '../../store/dataContext.js'
-import { formatCoords, formatTime } from '../../utils/format.js'
+import { formatCoords, formatTime, todayISO } from '../../utils/format.js'
+import { exceptionOn, isPickupDate, scheduleLabel } from '../../data/schedule.js'
 import '../components/AdminPage.css'
 import './LiveTrackingPage.css'
 
@@ -23,10 +25,18 @@ export default function LiveTrackingPage() {
   const [focusRequest, setFocusRequest] = useState(null)
 
   const focus = (type) => setFocusRequest({ type, id: Date.now() })
-  const statusBadge = (
+  const waitingStop = progress?.waitingAt ? route.stops.find((s) => s.id === progress.waitingAt) : null
+  const statusBadge = waitingStop ? (
+    <StatusBadge tone="amber">Waiting at stop</StatusBadge>
+  ) : (
     <StatusBadge tone={STATUS_TONES[state.status]}>{STATUS_LABELS[state.status]}</StatusBadge>
   )
-  const atStop = state.status === 'running' && state.step === 0 && state.legIndex > 0
+  // Current stop: where the truck is standing (or waiting). Next stop: the
+  // next pickup point not yet recorded.
+  const atStop = state.step === 0 && state.legIndex > 0 && state.status !== 'idle'
+  const currentStop = waitingStop ?? (atStop ? route.stops[state.legIndex] : null)
+  const fromIndex = currentStop ? route.stops.indexOf(currentStop) : state.legIndex
+  const nextStop = route.stops.slice(fromIndex + 1).find((s) => s.households > 0 && !['collected', 'missed'].includes(progress?.statusOf(s)))
 
   return (
     <div className="admin-page lt-page">
@@ -38,16 +48,32 @@ export default function LiveTrackingPage() {
           <h1>Live Tracking</h1>
         </div>
         <div className="admin-page__actions">
-          <StatusBadge tone="amber">SIMULATED GPS · DEMO MODE</StatusBadge>
+          <StatusBadge tone={isPickupDate(todayISO(), data.scheduleExceptions) ? 'green' : 'gray'}>
+            {isPickupDate(todayISO(), data.scheduleExceptions)
+              ? 'Collection day today'
+              : exceptionOn(todayISO(), data.scheduleExceptions)
+                ? `No collection today · ${exceptionOn(todayISO(), data.scheduleExceptions).reason}`
+                : `No collection today · ${scheduleLabel}`}
+          </StatusBadge>
+          <StatusBadge tone="amber">SIMULATED GPS — DEMO MODE</StatusBadge>
           <SimulationControls />
         </div>
       </header>
+
+      {waitingStop && (
+        <div className="ct-alert" role="status">
+          <span>
+            The demo truck is waiting at <strong>{waitingStop.name}</strong> until the driver (or the office, in
+            Collection Monitoring) records this pickup point as collected or missed.
+          </span>
+        </div>
+      )}
 
       {!route.coordinatesVerified && (
         <div className="ct-alert ct-alert--warning">
           <span>
             <strong>Demo route:</strong> stop positions are illustrative and are not verified locations in
-            Barangay San Antonio. The truck position is simulated, not real GPS.
+            the barangay. The truck position is simulated, not real GPS.
           </span>
         </div>
       )}
@@ -177,8 +203,10 @@ export default function LiveTrackingPage() {
                 <dd className="ct-mono" data-testid="truck-position">
                   {formatCoords(state.position)}
                 </dd>
-                <dt>{atStop ? 'At stop' : 'Next stop'}</dt>
-                <dd>{atStop ? route.stops[state.legIndex].name : (progress.nextStop?.name ?? '—')}</dd>
+                <dt>Current stop</dt>
+                <dd>{currentStop?.name ?? (state.status === 'idle' ? 'At the depot' : 'Driving')}</dd>
+                <dt>Next stop</dt>
+                <dd>{nextStop?.name ?? '—'}</dd>
                 <dt>Last update</dt>
                 <dd>{formatTime(state.updatedAt)}</dd>
               </dl>
@@ -207,6 +235,8 @@ export default function LiveTrackingPage() {
           </section>
         </div>
       )}
+
+      {!error && <LocationLogCard refreshKey={`${data.simulation.status}-${data.activeRunId}-${progress?.collected}-${progress?.waitingAt}`} />}
 
       <footer className="lt-statusbar">
         <span>● Simulated GPS · updates every {tickMs / 1000}s</span>

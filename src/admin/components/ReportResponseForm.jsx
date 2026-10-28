@@ -39,7 +39,7 @@ export default function ReportResponseForm({ report, onSave }) {
         </button>
         {report.status === 'submitted' && (
           <button type="button" className="ct-btn ct-btn--soft" onClick={() => save('in-progress')}>
-            <Wrench size={15} /> Mark In Progress
+            <Wrench size={15} /> Start Reviewing
           </button>
         )}
         {report.status !== 'resolved' ? (

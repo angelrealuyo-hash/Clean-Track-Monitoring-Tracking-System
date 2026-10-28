@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import RequireRole from './auth/RequireRole.jsx'
 import PortalChooser from './pages/PortalChooser.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
@@ -16,7 +16,7 @@ const Admin = {
   DashboardPage: lazy(() => import('./admin/pages/DashboardPage.jsx')),
   LiveTrackingPage: lazy(() => import('./admin/pages/LiveTrackingPage.jsx')),
   TruckPage: lazy(() => import('./admin/pages/TruckPage.jsx')),
-  DriverManagementPage: lazy(() => import('./admin/pages/DriverManagementPage.jsx')),
+  CollectorsPage: lazy(() => import('./admin/pages/CollectorsPage.jsx')),
   RoutesSchedulesPage: lazy(() => import('./admin/pages/RoutesSchedulesPage.jsx')),
   CollectionMonitoringPage: lazy(() => import('./admin/pages/CollectionMonitoringPage.jsx')),
   ResidentReportsPage: lazy(() => import('./admin/pages/ResidentReportsPage.jsx')),
@@ -40,9 +40,14 @@ const Driver = {
   LoginPage: lazy(() => import('./driver/pages/LoginPage.jsx')),
   HomePage: lazy(() => import('./driver/pages/HomePage.jsx')),
   MyRoutePage: lazy(() => import('./driver/pages/MyRoutePage.jsx')),
-  CollectionPage: lazy(() => import('./driver/pages/CollectionPage.jsx')),
+  ReportProblemPage: lazy(() => import('./driver/pages/ReportProblemPage.jsx')),
   NotificationsPage: lazy(() => import('./driver/pages/NotificationsPage.jsx')),
   ProfilePage: lazy(() => import('./driver/pages/ProfilePage.jsx')),
+}
+
+function ToMyRoute() {
+  const { search } = useLocation()
+  return <Navigate to={`/driver/route${search}`} replace />
 }
 
 // All pages in CleanTrack. Each app has its own login and is protected
@@ -66,7 +71,10 @@ export default function App() {
           <Route index element={<Admin.DashboardPage />} />
           <Route path="live-tracking" element={<Admin.LiveTrackingPage />} />
           <Route path="truck" element={<Admin.TruckPage />} />
-          <Route path="drivers" element={<Admin.DriverManagementPage />} />
+          <Route path="collectors" element={<Admin.CollectorsPage />} />
+          {/* Old links: Driver and Crew Management are now one page. */}
+          <Route path="drivers" element={<Navigate to="/admin/collectors?type=driver" replace />} />
+          <Route path="crew" element={<Navigate to="/admin/collectors?type=crew" replace />} />
           <Route path="routes" element={<Admin.RoutesSchedulesPage />} />
           <Route path="collection" element={<Admin.CollectionMonitoringPage />} />
           <Route path="resident-reports" element={<Admin.ResidentReportsPage />} />
@@ -108,7 +116,9 @@ export default function App() {
         >
           <Route index element={<Driver.HomePage />} />
           <Route path="route" element={<Driver.MyRoutePage />} />
-          <Route path="collection" element={<Driver.CollectionPage />} />
+          <Route path="report" element={<Driver.ReportProblemPage />} />
+          {/* Old links (e.g. saved notifications) now open My Route. */}
+          <Route path="collection" element={<ToMyRoute />} />
           <Route path="notifications" element={<Driver.NotificationsPage />} />
           <Route path="profile" element={<Driver.ProfilePage />} />
         </Route>

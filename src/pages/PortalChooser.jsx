@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, House, MonitorCog, Truck } from 'lucide-react'
 import Logo from '../components/Logo.jsx'
 import StatusBadge from '../components/StatusBadge.jsx'
-import { barangay } from '../data/barangay.js'
 import './PortalChooser.css'
 
 const portals = [
@@ -36,7 +35,7 @@ export default function PortalChooser() {
       <header className="portal__header">
         <Logo size={56} />
         <h1>CleanTrack</h1>
-        <p>Garbage Truck Monitoring System · {barangay.name}</p>
+        <p>Garbage Truck Monitoring System</p>
         <StatusBadge tone="amber">Student project prototype · Truck locations are simulated</StatusBadge>
       </header>
 

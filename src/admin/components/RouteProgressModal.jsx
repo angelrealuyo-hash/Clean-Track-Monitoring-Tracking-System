@@ -59,7 +59,7 @@ export default function RouteProgressModal({ truckId, onClose }) {
                   <strong>{stop.name}</strong>
                   <small>
                     {stop.purok}
-                    {stop.bins > 0 && ` · ${stop.bins} bins`} · {stopText[status]}
+                    {stop.households > 0 && ` · ${stop.households} households`} · {stopText[status]}
                   </small>
                 </div>
               </li>

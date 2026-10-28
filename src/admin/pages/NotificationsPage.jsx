@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AuthImage from '../../components/AuthImage.jsx'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Bell,
@@ -8,6 +9,7 @@ import {
   Clock,
   ExternalLink,
   Inbox,
+  Mail,
   Megaphone,
   Search,
   Send,
@@ -17,6 +19,8 @@ import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
 import DetailPanel, { DetailSection } from '../components/DetailPanel.jsx'
 import NotifyResidentsModal from '../components/NotifyResidentsModal.jsx'
+import EmailLogCard from '../components/EmailLogCard.jsx'
+import { useEmailLog } from '../components/useEmailLog.js'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useToast } from '../../components/toast/toastContext.js'
@@ -30,8 +34,19 @@ export default function NotificationsPage() {
   const { data, dispatch } = useData()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') === 'outbox' ? 'outbox' : 'feed'
-  const setTab = (t) => setParams(t === 'outbox' ? { tab: 'outbox' } : {}, { replace: true })
+  const tab = ['outbox', 'email'].includes(params.get('tab')) ? params.get('tab') : 'feed'
+  const setTab = (t) => setParams(t === 'feed' ? {} : { tab: t }, { replace: true })
+  const emailLog = useEmailLog()
+  // Email result per broadcast, from the server's email log.
+  const emailFor = (broadcastId) => {
+    const rows = emailLog.entries.filter((e) => e.related_type === 'broadcast' && e.related_id === broadcastId)
+    if (!rows.length) return { tone: 'gray', label: 'Email: no recipients with email' }
+    const count = (st) => rows.filter((e) => e.status === st).length
+    if (count('not_configured')) return { tone: 'gray', label: `Email: not sent (not configured) · ${rows.length}` }
+    if (count('failed')) return { tone: 'red', label: `Email: ${count('sent')} sent, ${count('failed')} failed` }
+    if (count('queued')) return { tone: 'blue', label: `Email: ${count('queued')} queued` }
+    return { tone: 'green', label: `Email: ${count('sent')} sent` }
+  }
 
   const feed = data.notifications.filter((n) => n.audience === 'admin')
   const unread = feed.filter((n) => !n.read).length
@@ -68,6 +83,9 @@ export default function NotificationsPage() {
               </button>
               <button type="button" role="tab" aria-selected={tab === 'outbox'} onClick={() => setTab('outbox')}>
                 <Megaphone size={14} /> Resident Outbox <span className="ct-count">{data.broadcasts.length}</span>
+              </button>
+              <button type="button" role="tab" aria-selected={tab === 'email'} onClick={() => setTab('email')}>
+                <Mail size={14} /> Email Log
               </button>
             </div>
             <button type="button" className="ct-btn ct-btn--primary" onClick={() => setComposeOpen(true)}>
@@ -114,8 +132,10 @@ export default function NotificationsPage() {
                   className="ct-btn ct-btn--secondary"
                   disabled={unread === 0}
                   onClick={() => {
-                    dispatch({ type: 'notification/markAllRead', payload: { audience: 'admin' } })
-                    toast('All notifications marked as read')
+                    dispatch({ type: 'notification/markAllRead', payload: { audience: 'admin' } }).then((res) => {
+                      if (!res.ok) return
+                      toast('All notifications marked as read')
+                    })
                   }}
                 >
                   <CheckCheck size={15} /> Mark All Read
@@ -186,7 +206,7 @@ export default function NotificationsPage() {
                   <strong>{selected.title}</strong>
                 </p>
                 <p>{selected.body}</p>
-                {selected.photo && <img className="notif-photo" src={selected.photo} alt="Photo sent with this alert" />}
+                {selected.photo && <AuthImage className="notif-photo" src={selected.photo} alt="Photo sent with this alert" />}
               </DetailSection>
               <DetailSection title="Status">
                 <p>{selected.read ? 'Read' : 'Unread'}</p>
@@ -196,7 +216,7 @@ export default function NotificationsPage() {
             <div className="ct-card ct-empty">Select a notification to see details.</div>
           )}
         </div>
-      ) : (
+      ) : tab === 'outbox' ? (
         <article className="ct-card">
           <div className="ct-card__header">
             <div>
@@ -234,11 +254,15 @@ export default function NotificationsPage() {
                         </td>
                         <td>
                           <span className="notif-channels">
-                            {b.channels.map((c) => (
-                              <span key={c} className="ct-tag">
-                                {c}
-                              </span>
-                            ))}
+                            {b.channels.map((c) =>
+                              c === 'App' ? (
+                                <StatusBadge key={c} tone="green">In-app: delivered</StatusBadge>
+                              ) : (
+                                <StatusBadge key={c} tone={emailFor(b.id).tone}>
+                                  {emailFor(b.id).label}
+                                </StatusBadge>
+                              ),
+                            )}
                           </span>
                         </td>
                         <td>{formatDateTime(b.sentAt)}</td>
@@ -251,19 +275,23 @@ export default function NotificationsPage() {
           </div>
           <div className="ct-table__foot">
             <span>Showing {broadcasts.length} broadcast(s)</span>
-            <span>Demo delivery: Resident app only</span>
+            <span>In-app messages are delivered in the Resident app. Email status comes from the email log. SMS is not available.</span>
           </div>
         </article>
+      ) : (
+        <EmailLogCard log={emailLog} />
       )}
 
       {composeOpen && (
         <NotifyResidentsModal
           onClose={() => setComposeOpen(false)}
           onSend={(broadcast) => {
-            dispatch({ type: 'broadcast/add', payload: broadcast })
-            toast(`Broadcast sent to ${broadcast.zone}`)
-            setComposeOpen(false)
-            setTab('outbox')
+            dispatch({ type: 'broadcast/add', payload: broadcast }).then((res) => {
+              if (!res.ok) return
+              toast(`Broadcast sent to ${broadcast.zone}`)
+              setComposeOpen(false)
+              setTab('outbox')
+            })
           }}
         />
       )}

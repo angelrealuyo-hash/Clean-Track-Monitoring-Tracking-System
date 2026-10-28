@@ -1,0 +1,18 @@
+.add-stop-map {
+  height: 260px;
+  cursor: crosshair;
+}
+
+.add-stop-map .leaflet-container {
+  cursor: crosshair;
+}
+
+.add-stop-pin span {
+  display: block;
+  width: 22px;
+  height: 22px;
+  background: var(--ct-amber-500);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}

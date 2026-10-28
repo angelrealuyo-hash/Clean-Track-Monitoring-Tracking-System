@@ -9,3 +9,61 @@
   justify-content: space-between;
   font-size: 13px;
 }
+
+.routes-add {
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.ct-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Holidays & suspended pickups */
+.exceptions-form {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(150px, 1fr) minmax(160px, 1.5fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.exceptions-form .ct-field {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .exceptions-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.exceptions-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exceptions-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--ct-border);
+}
+
+.exceptions-list__reason {
+  flex: 1 1 160px;
+  min-width: 0;
+  color: var(--ct-text-muted);
+}
+
+.exceptions-past {
+  display: block;
+  margin-top: 8px;
+  color: var(--ct-text-muted);
+}

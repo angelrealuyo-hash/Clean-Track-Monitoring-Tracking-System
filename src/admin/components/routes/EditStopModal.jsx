@@ -8,7 +8,7 @@ import { isCollectionStop } from '../../../services/trackingSimulation.js'
 // (see the note there) because they must come from a verified source.
 export default function EditStopModal({ stop, number, puroks, simRunning, onSave, onClose }) {
   const depot = !isCollectionStop(stop)
-  const [form, setForm] = useState({ name: stop.name, purok: stop.purok, bins: String(stop.bins) })
+  const [form, setForm] = useState({ name: stop.name, purok: stop.purok, households: String(stop.households) })
   const [errors, setErrors] = useState({})
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -16,11 +16,11 @@ export default function EditStopModal({ stop, number, puroks, simRunning, onSave
     e.preventDefault()
     const errs = {}
     if (form.name.trim().length < 3) errs.name = 'Stop name is required.'
-    const bins = Number(form.bins)
-    if (!depot && (!Number.isInteger(bins) || bins < 1 || bins > 100)) errs.bins = 'Enter 1 to 100 bins.'
+    const households = Number(form.households)
+    if (!depot && (!Number.isInteger(households) || households < 1 || households > 500)) errs.households = 'Enter 1 to 500 households.'
     setErrors(errs)
     if (Object.keys(errs).length) return
-    onSave(depot ? { name: form.name.trim() } : { name: form.name.trim(), purok: form.purok, bins })
+    onSave(depot ? { name: form.name.trim() } : { name: form.name.trim(), purok: form.purok, households })
   }
 
   return (
@@ -53,8 +53,8 @@ export default function EditStopModal({ stop, number, puroks, simRunning, onSave
                 ))}
               </select>
             </Field>
-            <Field label="Bins at this stop" htmlFor="s-bins" required error={errors.bins}>
-              <input id="s-bins" className="ct-input" type="number" min="1" max="100" value={form.bins} onChange={set('bins')} aria-invalid={!!errors.bins} />
+            <Field label="Households that bring bags here" htmlFor="s-bins" required error={errors.households}>
+              <input id="s-bins" className="ct-input" type="number" min="1" max="500" value={form.households} onChange={set('households')} aria-invalid={!!errors.households} />
             </Field>
           </div>
         )}

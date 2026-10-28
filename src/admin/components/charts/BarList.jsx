@@ -2,8 +2,9 @@ import './charts.css'
 
 // Horizontal bars for one measure (e.g. reports per category).
 // One hue, value labelled at the end of each bar, tooltip on hover/focus.
-export default function BarList({ items, unit = '', label }) {
-  const max = Math.max(1, ...items.map((i) => i.value))
+// `max` fixes the scale (e.g. 100 for percentages); otherwise the largest value.
+export default function BarList({ items, unit = '', label, max: fixedMax }) {
+  const max = fixedMax ?? Math.max(1, ...items.map((i) => i.value))
   if (items.length === 0) return <p className="ct-empty">No data yet.</p>
   return (
     <ul className="bar-list" aria-label={label}>
@@ -19,7 +20,10 @@ export default function BarList({ items, unit = '', label }) {
                 {tip}
               </span>
             </span>
-            <span className="bar-list__value">{item.value}</span>
+            <span className="bar-list__value">
+              {item.value}
+              {unit === '%' ? '%' : ''}
+            </span>
           </li>
         )
       })}

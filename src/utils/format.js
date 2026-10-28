@@ -32,8 +32,20 @@ export function formatDate(value) {
 }
 
 export function todayISO() {
-  const d = new Date()
+  return localDateISO(new Date())
+}
+
+// "YYYY-MM-DD" of a date/timestamp in local time.
+export function localDateISO(value) {
+  const d = new Date(value)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// "YYYY-MM-DD" n days before today (local time).
+export function daysAgoISO(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return localDateISO(d)
 }
 
 // "06:00 AM" <-> "06:00" (for <input type="time">)

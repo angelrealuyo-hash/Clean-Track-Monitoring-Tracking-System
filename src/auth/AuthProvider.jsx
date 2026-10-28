@@ -1,13 +1,12 @@
-// Demo-only sign-in. There is no backend: admin and driver accounts come from
-// data/users.js, resident accounts from the data store (so "Create Account"
-// works). Each app (admin, resident, driver) has its own session, so you can be
-// signed in to all three at once while testing.
+// Sign-in for the three apps. The SERVER checks passwords and returns a signed
+// token; this keeps one session per app (admin, resident, driver), so all
+// three can be open at once while testing. Only the token and the user's id
+// and name are stored in the browser, never passwords or app data.
 import { useCallback, useMemo, useState } from 'react'
 import { AuthContext } from './authContext.js'
-import { demoUsers } from '../data/users.js'
-import { useData } from '../store/dataContext.js'
+import { api } from '../api/client.js'
 
-const STORAGE_KEY = 'cleantrack.sessions'
+const STORAGE_KEY = 'cleantrack.sessions.v2'
 
 function read(store) {
   try {
@@ -17,60 +16,56 @@ function read(store) {
   }
 }
 
-function write(store, data) {
+function write(store, value) {
   try {
-    store.setItem(STORAGE_KEY, JSON.stringify(data))
+    store.setItem(STORAGE_KEY, JSON.stringify(value))
   } catch {
-    // Storage can be blocked (private mode); the session then lasts until refresh.
+    // Storage blocked (private mode): the session lasts until the tab closes.
   }
 }
 
-const sameEmail = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase()
-
 export default function AuthProvider({ children }) {
-  const { data } = useData()
   // "Remember me" sessions live in localStorage; others only for this tab.
-  const [sessions, setSessions] = useState(() => ({
-    ...read(localStorage),
-    ...read(sessionStorage),
-  }))
-
-  // Apps the user signed out of on purpose. Their login page then opens the
-  // app's home after the next sign-in, not the page they were on.
+  const [sessions, setSessions] = useState(() => ({ ...read(localStorage), ...read(sessionStorage) }))
+  // Apps the user signed out of on purpose: their next sign-in opens the app home.
   const [signedOut, setSignedOut] = useState({})
 
-  const start = useCallback((role, session, remember) => {
+  const start = useCallback((role, { token, user }, remember) => {
+    const session = { token, id: user.refId, name: user.name, ...(user.title ? { title: user.title, initials: user.initials } : {}) }
     setSignedOut((s) => ({ ...s, [role]: false }))
     setSessions((s) => ({ ...s, [role]: session }))
     write(sessionStorage, { ...read(sessionStorage), [role]: session })
     if (remember) write(localStorage, { ...read(localStorage), [role]: session })
   }, [])
 
-  // Returns true when the email/password match an account for that app.
+  // Returns { ok: true } or { ok: false, error }.
   const login = useCallback(
-    (role, email, password, remember = false) => {
-      let session = null
-      if (role === 'resident') {
-        const r = data.residents.find((x) => sameEmail(x.email, email) && x.password === password)
-        if (r) session = { id: r.id }
-      } else {
-        const u = demoUsers[role]
-        if (u && sameEmail(u.email, email) && u.password === password) {
-          session = role === 'driver' ? { id: u.id } : { id: 'ADMIN', name: u.name, title: u.title, initials: u.initials }
-        }
+    async (role, identifier, password, remember = false) => {
+      try {
+        start(role, await api('/auth/login', { body: { role, identifier, password } }), remember)
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err.message }
       }
-      if (!session) return false
-      start(role, session, remember)
-      return true
     },
-    [data.residents, start],
+    [start],
   )
 
-  // Signs in an account that was just created (Create Account).
-  const loginAs = useCallback((role, id, remember = true) => start(role, { id }, remember), [start])
+  const register = useCallback(
+    async (form) => {
+      try {
+        start('resident', await api('/auth/register', { body: form }), true)
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err.message, status: err.status }
+      }
+    },
+    [start],
+  )
 
-  const logout = useCallback((role) => {
-    setSignedOut((s) => ({ ...s, [role]: true }))
+  // reason: 'manual' (Sign Out button) or 'expired' (server said sign in again).
+  const logout = useCallback((role, reason = 'manual') => {
+    if (reason === 'manual') setSignedOut((s) => ({ ...s, [role]: true }))
     setSessions((s) => {
       const next = { ...s }
       delete next[role]
@@ -83,9 +78,6 @@ export default function AuthProvider({ children }) {
     }
   }, [])
 
-  const value = useMemo(
-    () => ({ sessions, signedOut, login, loginAs, logout }),
-    [sessions, signedOut, login, loginAs, logout],
-  )
+  const value = useMemo(() => ({ sessions, signedOut, login, register, logout }), [sessions, signedOut, login, register, logout])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

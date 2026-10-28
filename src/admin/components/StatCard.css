@@ -39,6 +39,7 @@
 
 .stat-card__icon--green { color: var(--ct-green-900); background: var(--ct-green-100); }
 .stat-card__icon--amber { color: #a06100; background: var(--ct-amber-100); }
+.stat-card__icon--blue { color: var(--ct-blue-600); background: var(--ct-blue-100); }
 
 .stat-card__value {
   margin: 8px 0 6px;
