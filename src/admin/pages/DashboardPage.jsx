@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { isCollectionDay, isPickupDate, scheduleLabel } from '../../data/schedule.js'
+import { todayISO } from '../../utils/format.js'
 import {
   ArrowRight,
   CircleCheck,
@@ -51,7 +53,7 @@ export default function DashboardPage() {
   const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const upcoming = [1, 2, 3, 4, 5, 6, 7]
     .map((i) => data.weeklySchedule.find((d) => d.day === DAYS[(DAYS.indexOf(today) + i) % 7]))
-    .filter((d) => d && d.wasteType !== 'No collection')
+    .filter((d) => d && isCollectionDay(d.day))
     .slice(0, 3)
 
   return (
@@ -213,16 +215,22 @@ export default function DashboardPage() {
               <dt>Start time</dt>
               <dd>{route.startTime}</dd>
               <dt>Today&apos;s collection</dt>
-              <dd>{todaysRun?.wasteType ?? 'No collection'}</dd>
+              <dd>
+                {isPickupDate(todayISO(), data.scheduleExceptions)
+                  ? 'Garbage collection day'
+                  : isCollectionDay(today)
+                    ? 'No collection (holiday / suspension)'
+                    : `No collection (${scheduleLabel} only)`}
+              </dd>
               <dt>Time window</dt>
-              <dd>{todaysRun?.window ?? '—'}</dd>
+              <dd>{isPickupDate(todayISO(), data.scheduleExceptions) ? todaysRun?.window : '—'}</dd>
               <dt>Upcoming</dt>
               <dd>
                 {upcoming.length === 0
                   ? 'No other pickup days'
                   : upcoming.map((d) => (
                       <span key={d.day} className="dashboard__upcoming">
-                        {d.day}: {d.wasteType.split(' (')[0]}, {d.window.split(' - ')[0]}
+                        {d.day}, {d.window.split(' - ')[0]}
                       </span>
                     ))}
               </dd>

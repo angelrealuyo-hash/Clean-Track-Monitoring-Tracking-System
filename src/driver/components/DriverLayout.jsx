@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Bell, ClipboardCheck, LayoutDashboard, Route, User } from 'lucide-react'
+import { Bell, LayoutDashboard, Route, User } from 'lucide-react'
 import MobileAppLayout from '../../components/MobileAppLayout.jsx'
 import Logo from '../../components/Logo.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
@@ -7,11 +7,10 @@ import { useData } from '../../store/dataContext.js'
 import { useDriver } from '../../auth/useAccount.js'
 import { driverStatusMeta } from '../../store/selectors.js'
 
-// Bottom tabs from PDF pages 45-49.
+// Three bottom tabs. Collecting at each stop happens inside My Route.
 const tabs = [
-  { to: '/driver', label: 'Home', icon: LayoutDashboard, end: true, alsoActiveOn: ['/driver/notifications'] },
+  { to: '/driver', label: 'Home', icon: LayoutDashboard, end: true, alsoActiveOn: ['/driver/notifications', '/driver/report'] },
   { to: '/driver/route', label: 'My Route', icon: Route },
-  { to: '/driver/collection', label: 'Collection', icon: ClipboardCheck },
   { to: '/driver/profile', label: 'Profile', icon: User },
 ]
 

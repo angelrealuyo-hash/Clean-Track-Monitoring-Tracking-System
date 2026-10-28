@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Bell, Building2, Database, History, KeyRound, RotateCcw, Save, SlidersHorizontal, Truck, UserCog } from 'lucide-react'
+import { Bell, Building2, Phone, Database, History, KeyRound, RotateCcw, Save, SlidersHorizontal, Truck, UserCog } from 'lucide-react'
 import ChangePasswordModal from '../../components/ChangePasswordModal.jsx'
+import AvatarPicker from '../../components/AvatarPicker.jsx'
 import { useAuth } from '../../auth/authContext.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Field from '../../components/Field.jsx'
@@ -18,6 +19,11 @@ const notificationToggles = [
     key: 'autoProximityAlerts',
     label: 'Truck Coming Alerts (in-app)',
     hint: 'When the demo truck heads to a purok, residents there get a message in the Resident app.',
+  },
+  {
+    key: 'autoPickupCheck',
+    label: 'Today’s Pick Up Check (in-app)',
+    hint: 'About an hour before pickup, residents are asked “Are you planning to dispose of your garbage today?”. Their answers feed Reports & Analytics.',
   },
   {
     key: 'autoScheduleReminders',
@@ -52,6 +58,16 @@ export default function SettingsPage() {
   const [errors, setErrors] = useState({})
   const [confirmReset, setConfirmReset] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
+  const [photoSaving, setPhotoSaving] = useState(false)
+
+  // The profile picture saves right away (separate from Save Changes below).
+  function setPhoto(photo) {
+    setPhotoSaving(true)
+    dispatch({ type: 'admin/setPhoto', payload: { photo } }).then((res) => {
+      setPhotoSaving(false)
+      if (res.ok) toast(photo ? 'Profile picture saved' : 'Profile picture removed')
+    })
+  }
   const { sessions } = useAuth()
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(data.settings)
@@ -62,12 +78,14 @@ export default function SettingsPage() {
     const errs = {}
     const name = draft.barangayName.trim()
     if (name && name.length < 3) errs.barangayName = 'Use at least 3 characters, or leave it empty.'
+    const phone = (draft.officePhone ?? '').trim()
+    if (phone && !/^\+?[\d\s()-]{7,20}$/.test(phone)) errs.officePhone = 'Use digits, spaces, ( ) - and + only, e.g. (02) 8123 4567.'
     setErrors(errs)
     if (Object.keys(errs).length) {
       toast('Please fix the highlighted fields', 'error')
       return
     }
-    const clean = { ...draft, barangayName: draft.barangayName.trim() }
+    const clean = { ...draft, barangayName: draft.barangayName.trim(), officePhone: phone }
     dispatch({ type: 'settings/update', payload: clean }).then((res) => {
       if (!res.ok) return
       setDraft(clean)
@@ -116,12 +134,26 @@ export default function SettingsPage() {
             <p>Your personal sign-in (separate from the system settings below)</p>
           </div>
         </header>
-        <div className="settings-section__body settings-toggle">
-          <div>
-            <strong>{sessions.admin?.name}</strong>
-            <p>{sessions.admin?.title} · admin@cleantrack.gov</p>
+        <div className="settings-section__body settings-account">
+          <div className="settings-account__photo">
+            <span className="ct-label">Profile Picture</span>
+            <AvatarPicker value={data.adminPhoto ?? null} onChange={setPhoto} initials={sessions.admin?.initials ?? 'A'} name={sessions.admin?.name} busy={photoSaving} size={56} />
           </div>
-          <button type="button" className="ct-btn ct-btn--secondary" onClick={() => setPwOpen(true)}>
+          <dl className="settings-account__info">
+            <div>
+              <dt>Name</dt>
+              <dd>{sessions.admin?.name}</dd>
+            </div>
+            <div>
+              <dt>Position</dt>
+              <dd>{sessions.admin?.title}</dd>
+            </div>
+            <div>
+              <dt>Sign-in email</dt>
+              <dd>admin@cleantrack.gov</dd>
+            </div>
+          </dl>
+          <button type="button" className="ct-btn ct-btn--secondary settings-account__btn" onClick={() => setPwOpen(true)}>
             <KeyRound size={15} /> Change Password
           </button>
         </div>
@@ -134,6 +166,25 @@ export default function SettingsPage() {
           <div className="ct-input-group">
             <Building2 size={16} />
             <input id="st-name" value={draft.barangayName} onChange={set('barangayName')} aria-invalid={!!errors.barangayName} />
+          </div>
+        </Field>
+        <Field
+          label="Office Phone for Drivers (optional)"
+          htmlFor="st-phone"
+          error={errors.officePhone}
+          hint="Used by the “Call the Office” button in the Driver app. Leave empty until you have the official number."
+        >
+          <div className="ct-input-group">
+            <Phone size={16} />
+            <input
+              id="st-phone"
+              type="tel"
+              inputMode="tel"
+              placeholder="Not set"
+              value={draft.officePhone ?? ''}
+              onChange={set('officePhone')}
+              aria-invalid={!!errors.officePhone}
+            />
           </div>
         </Field>
       </Section>
@@ -192,7 +243,7 @@ export default function SettingsPage() {
                 <p>{t.hint}</p>
               </div>
               <label className="ct-switch">
-                <input type="checkbox" role="switch" aria-labelledby={`lbl-${t.key}`} checked={draft[t.key]} onChange={set(t.key)} />
+                <input type="checkbox" role="switch" aria-labelledby={`lbl-${t.key}`} checked={Boolean(draft[t.key] ?? defaultSettings[t.key])} onChange={set(t.key)} />
                 <span />
               </label>
             </li>

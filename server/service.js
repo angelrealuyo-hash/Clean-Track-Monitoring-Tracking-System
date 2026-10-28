@@ -5,9 +5,10 @@ import { dataReducer, nextId, currentRun } from '../src/store/dataReducer.js'
 import { createInitialData } from '../src/store/initialData.js'
 import { viewFor } from '../src/store/view.js'
 import { computeSimulation, isCollectionStop } from '../src/services/trackingSimulation.js'
-import { plainWaste } from '../src/data/plainWords.js'
+import { isCollectionDay, isPickupDate, scheduleLabel } from '../src/data/schedule.js'
+import { storeActionImage, removeUnusedImages } from './uploads.js'
 import { demoUsers } from '../src/data/users.js'
-import { todayISO, todayName } from '../src/utils/format.js'
+import { to24h, todayISO, todayName } from '../src/utils/format.js'
 import { normalizePhone } from '../src/utils/validate.js'
 import { transaction } from './db.js'
 import { hasData, loadState, saveState, findAccount, getAccountByRef, insertAccount, updateAccount, logLocation } from './repository.js'
@@ -133,14 +134,19 @@ export function createService(db) {
 
   /** Applies an action for a signed-in user. Returns the user's new data snapshot. */
   function perform(user, rawAction) {
-    const { action, effects } = prepareAction(state, user, rawAction)
+    const prepared = prepareAction(state, user, rawAction)
+    const { effects } = prepared
     precheck(effects)
+    // Photos are stored in the uploads table; the record keeps "upl:<id>".
+    const action = storeActionImage(db, user, prepared.action)
+    const hadImage = action !== prepared.action
     const before = state
     const next = dataReducer(state, action)
     if (next !== state) {
       transaction(db, () => runEffects(effects, before, next))
       commit(next)
       if (LOGGED_ACTIONS.has(action.type)) logTruck(state, action.type)
+      if (hadImage || /photo/i.test(JSON.stringify(rawAction.payload ?? {}))) removeUnusedImages(db, state)
       kickEmail()
     }
     return snapshotFor(user)
@@ -206,8 +212,10 @@ export function createService(db) {
 
     // Pickup-day reminder, once per day.
     const today = todayISO()
-    const run = state.weeklySchedule.find((d) => d.day === todayName())
-    if (s.autoScheduleReminders && run && run.wasteType !== 'No collection') {
+    // Official collection days only (Mon/Wed/Fri), whatever the saved rows say.
+    // Holidays / suspensions set by the admin cancel the day's pickup too.
+    const run = isCollectionDay(todayName()) && isPickupDate(todayISO(), state.scheduleExceptions) ? state.weeklySchedule.find((d) => d.day === todayName()) : null
+    if (s.autoScheduleReminders && run) {
       const start = run.window.split(' - ')[0]
       const added = addAuto({
         key: `schedule-${today}`,
@@ -215,7 +223,7 @@ export function createService(db) {
         zone: 'All Puroks',
         kind: 'schedule',
         priority: 'medium',
-        title: `Pickup today: ${plainWaste(run.wasteType)}`,
+        title: `Garbage pickup today, ${run.window}`,
         body: `Please put your tied garbage bags out before ${start}.`,
         link: { label: 'See pickup days', to: '/resident/schedule' },
       })
@@ -225,12 +233,32 @@ export function createService(db) {
           (r) => ({
             eventKey: `schedule:${today}:${r.id}`,
             to: r.email,
-            subject: `CleanTrack: pickup today (${plainWaste(run.wasteType)})`,
-            body: `Hello ${r.name},\n\nToday's pickup is ${plainWaste(run.wasteType)}, ${run.window}. Please put your tied garbage bags out before ${start}.\n\n— ${s.barangayName || 'CleanTrack'}`,
+            subject: 'CleanTrack: garbage pickup today',
+            body: `Hello ${r.name},\n\nThere is garbage pickup today, ${run.window} (pickup days: ${scheduleLabel}). Please put your tied garbage bags out before ${start}.\n\n— ${s.barangayName || 'CleanTrack'}`,
             relatedType: 'schedule',
             relatedId: today,
           }),
         )
+    }
+
+    // Today's Pick Up Check: one in-app question per pickup day, about an hour
+    // before the pickup window starts. Answers come back through feedback/submit
+    // (one record per resident per day), and answering marks it read.
+    if (s.autoPickupCheck !== false && run) {
+      const [h, m] = (to24h(run.window.split(' - ')[0]) || '00:00').split(':').map(Number)
+      const askAt = new Date(nowMs)
+      askAt.setHours(h - 1, m, 0, 0)
+      if (nowMs >= askAt.getTime())
+        addAuto({
+          key: `pickup-check-${today}`,
+          audience: 'resident',
+          zone: 'All Puroks',
+          kind: 'pickup-check',
+          priority: 'medium',
+          title: 'Today’s Pick Up Check!',
+          body: `Are you planning to dispose of your garbage today? Pickup time: ${run.window}.`,
+          link: { label: 'Answer now', to: '/resident#pickup-check' },
+        })
     }
 
     // Truck approaching a purok (simulated).

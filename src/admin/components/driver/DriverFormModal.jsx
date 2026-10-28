@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { UserPen, UserPlus } from 'lucide-react'
 import Modal from '../../../components/Modal.jsx'
 import Field from '../../../components/Field.jsx'
+import AvatarPicker from '../../../components/AvatarPicker.jsx'
+import { initials } from '../../../store/dataReducer.js'
 import { shiftOptions } from '../../../data/drivers.js'
 import { driverStatusMeta } from '../../../store/selectors.js'
 
 // Add or edit a driver. `driver` is null when adding.
-export default function DriverFormModal({ driver, onSave, onClose }) {
+export default function DriverFormModal({ driver, onSave, onClose, saving = false }) {
   const editing = Boolean(driver)
   const [form, setForm] = useState({
     name: driver?.name ?? '',
@@ -17,12 +19,14 @@ export default function DriverFormModal({ driver, onSave, onClose }) {
     email: driver?.email ?? '',
     password: '',
     account: driver?.account === 'disabled' ? 'disabled' : 'active',
+    photo: driver?.photo ?? null,
   })
   const [errors, setErrors] = useState({})
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   function submit(e) {
     e.preventDefault()
+    if (saving) return
     const errs = {}
     if (form.name.trim().length < 3) errs.name = 'Enter the driver’s full name.'
     // Philippine mobile: +63 9XX XXX XXXX or 09XX XXX XXXX
@@ -40,6 +44,8 @@ export default function DriverFormModal({ driver, onSave, onClose }) {
     if (form.password) out.password = form.password
     // Sign-in on/off only applies to drivers who have an account.
     if (editing && driver.account !== 'none') out.account = form.account
+    // Only send the picture when it changed (new, replaced or removed).
+    if (form.photo !== (driver?.photo ?? null)) out.photo = form.photo
     onSave(out)
   }
 
@@ -55,13 +61,17 @@ export default function DriverFormModal({ driver, onSave, onClose }) {
           <button type="button" className="ct-btn ct-btn--secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" form="driver-form" className="ct-btn ct-btn--primary">
-            {editing ? 'Update Driver' : 'Add Driver'}
+          <button type="submit" form="driver-form" className="ct-btn ct-btn--primary" disabled={saving}>
+            {saving ? 'Saving…' : editing ? 'Update Driver' : 'Add Driver'}
           </button>
         </>
       }
     >
       <form id="driver-form" className="ct-form-grid" onSubmit={submit} noValidate>
+        <div className="ct-field is-wide">
+          <span className="ct-label">Profile Picture (optional)</span>
+          <AvatarPicker value={form.photo} onChange={(photo) => setForm((f) => ({ ...f, photo }))} initials={initials(form.name || '?')} name={form.name} busy={saving} />
+        </div>
         <Field label="Full Name" htmlFor="d-name" required error={errors.name} className="is-wide">
           <input id="d-name" className="ct-input" value={form.name} onChange={set('name')} aria-invalid={!!errors.name} autoFocus />
         </Field>

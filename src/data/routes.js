@@ -16,6 +16,8 @@
 //   2. Put the values in `coords: [latitude, longitude]` below, in driving order.
 //   3. Update `center` in barangay.js to the middle of the barangay.
 //   4. Set coordinatesVerified to true once the barangay office confirms them.
+import { normalizeSchedule } from './schedule.js'
+
 export const route = {
   id: 'RT-01',
   name: 'Barangay Collection Route (demo)',
@@ -38,24 +40,9 @@ export const route = {
   ],
 }
 
-// Weekly schedule shown to residents (RA 9003 segregation by day).
-export const weeklySchedule = [
-  { day: 'Monday', wasteType: 'Biodegradable (Kitchen & Yard Waste)', window: '06:00 AM - 10:00 AM' },
-  { day: 'Tuesday', wasteType: 'Residual Non-Recyclable Waste', window: '06:00 AM - 10:00 AM' },
-  { day: 'Wednesday', wasteType: 'Biodegradable (Kitchen & Yard Waste)', window: '06:00 AM - 10:00 AM' },
-  { day: 'Thursday', wasteType: 'Recyclables (Plastics, Cartons, Metals)', window: '06:00 AM - 10:00 AM' },
-  { day: 'Friday', wasteType: 'Biodegradable (Kitchen & Yard Waste)', window: '06:00 AM - 10:00 AM' },
-  { day: 'Saturday', wasteType: 'Hazardous & Electronic Waste (Drop-off)', window: '09:00 AM - 12:00 PM' },
-  { day: 'Sunday', wasteType: 'No collection', window: '-' },
-]
-
-export const wasteTypes = [
-  'Biodegradable (Kitchen & Yard Waste)',
-  'Recyclables (Plastics, Cartons, Metals)',
-  'Residual Non-Recyclable Waste',
-  'Hazardous & Electronic Waste (Drop-off)',
-  'No collection',
-]
+// Weekly schedule: official collection days are Monday, Wednesday and Friday
+// (see schedule.js). Residents do not sort waste by type in this app.
+export const weeklySchedule = normalizeSchedule()
 
 // Reasons an admin can record when a stop is missed (Collection Monitoring).
 export const missedReasons = [

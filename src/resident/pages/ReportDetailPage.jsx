@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import AuthImage from '../../components/AuthImage.jsx'
 import { ArrowLeft, Clock, FileText, History, MapPin, Phone, ShieldCheck, User } from 'lucide-react'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useData } from '../../store/dataContext.js'
@@ -101,7 +102,7 @@ export default function ReportDetailPage() {
       <section className="m-card">
         <h2 className="m-section-title">What you told us</h2>
         <p className="res-report-desc">“{report.description}”</p>
-        {report.photo ? <img className="res-photo-full" src={report.photo} alt="Your photo" /> : <p className="m-muted">No photo.</p>}
+        {report.photo ? <AuthImage className="res-photo-full" src={report.photo} alt="Your photo" /> : <p className="m-muted">No photo.</p>}
       </section>
 
       <section className="m-card res-response">

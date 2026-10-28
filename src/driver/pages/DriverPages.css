@@ -127,3 +127,164 @@
   background: var(--ct-green-100);
   border-radius: 8px;
 }
+
+/* ---------- Home ---------- */
+.drv-start:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.drv-live {
+  border-top: 4px solid var(--ct-green-700);
+}
+
+.drv-footnote {
+  text-align: center;
+}
+
+.m-action.is-disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.m-action.is-disabled:hover {
+  border-color: var(--ct-border);
+}
+
+/* ---------- My Route ---------- */
+/* Fixed progress: sticks just below the app header while the page scrolls. */
+.drv-progress-bar {
+  position: sticky;
+  top: var(--mobile-sticky-top, 0px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Bleed to the page edges so cards scroll cleanly underneath. */
+  margin: -14px -14px 0;
+  padding: 10px 14px;
+  background: var(--ct-surface);
+  border-bottom: 1px solid var(--ct-border);
+  box-shadow: 0 2px 6px rgba(6, 78, 50, 0.06);
+}
+
+.drv-map-head {
+  padding: 8px 12px;
+}
+
+.drv-stop__name {
+  margin: 6px 0 2px;
+  font-size: 17px;
+}
+
+.drv-stop--active {
+  box-shadow: 0 4px 14px rgba(6, 78, 50, 0.12);
+}
+
+.drv-stop--compact {
+  align-items: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.drv-stop--compact p {
+  margin: 0;
+}
+
+.drv-stop__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.drv-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ct-green-700);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.drv-stop__side .drv-text-link {
+  margin-top: 0;
+}
+
+.drv-finish {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-color: #bfe3cc;
+}
+
+.drv-finish .ct-btn {
+  width: 100%;
+}
+
+.drv-bags {
+  width: 56px;
+  text-align: center;
+}
+
+.drv-end-shift {
+  min-height: 48px;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+/* My Crew */
+.drv-crew {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drv-crew.is-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.drv-crew li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.drv-crew li > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drv-crew strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drv-crew small {
+  font-size: 11px;
+  color: var(--ct-text-muted);
+}
+
+.drv-crew__avatar {
+  width: 36px;
+  height: 36px;
+}

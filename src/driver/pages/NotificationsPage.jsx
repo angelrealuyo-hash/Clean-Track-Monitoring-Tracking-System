@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Avatar from '../../components/Avatar.jsx'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Bell, CheckCheck, Clock } from 'lucide-react'
 import StatusBadge from '../../components/StatusBadge.jsx'
@@ -21,7 +22,7 @@ export default function NotificationsPage() {
   return (
     <div className="m-page">
       <section className="m-card m-row">
-        <span className="ct-avatar">{driver.initials}</span>
+        <Avatar photo={driver.photo} initials={driver.initials} name={driver.name} />
         <div className="m-grow">
           <strong>{driver.name}</strong>
           <p className="m-muted">

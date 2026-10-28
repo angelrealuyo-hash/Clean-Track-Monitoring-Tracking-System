@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ScheduleExceptionsCard from '../components/routes/ScheduleExceptionsCard.jsx'
 import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowUp, CalendarDays, Clock, MapPin, MapPinPlus, Package, Pencil, Route as RouteIcon, Trash2, Truck, TriangleAlert } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
@@ -17,6 +18,7 @@ import { useToast } from '../../components/toast/toastContext.js'
 import { STATUS_LABELS, STATUS_TONES, isCollectionStop } from '../../services/trackingSimulation.js'
 import { barangay } from '../../data/barangay.js'
 import { todayName } from '../../utils/format.js'
+import { isCollectionDay, scheduleLabel } from '../../data/schedule.js'
 import '../components/AdminPage.css'
 import './RoutesSchedulesPage.css'
 
@@ -32,7 +34,7 @@ export default function RoutesSchedulesPage() {
   const collectionStops = route.stops.filter(isCollectionStop)
   const totalHouseholds = collectionStops.reduce((n, s) => n + s.households, 0)
   const puroks = [...new Set(collectionStops.map((s) => s.purok))]
-  const collectionDays = weeklySchedule.filter((d) => d.wasteType !== 'No collection').length
+  const collectionDays = weeklySchedule.filter((d) => isCollectionDay(d.day)).length
   const simRunning = sim.status === 'running' || sim.status === 'paused'
   const today = todayName()
   const close = () => setModal(null)
@@ -61,7 +63,7 @@ export default function RoutesSchedulesPage() {
           <span>Departs {route.stops[0]?.name}</span>
         </StatCard>
         <StatCard label="Collection Days" icon={CalendarDays} value={collectionDays} unit="days / week">
-          <span>Today: {weeklySchedule.find((d) => d.day === today)?.wasteType ?? '—'}</span>
+          <span>{scheduleLabel} · today {isCollectionDay(today) ? 'is a collection day' : 'no collection'}</span>
         </StatCard>
       </section>
 
@@ -170,7 +172,7 @@ export default function RoutesSchedulesPage() {
             <div className="ct-card__header">
               <div>
                 <h2>Weekly Collection Schedule</h2>
-                <p>Segregated collection by day (RA 9003). Residents see this in their app.</p>
+                <p>Official collection days: {scheduleLabel} only. You can change their pickup times. Residents and the driver see this.</p>
               </div>
             </div>
             <div className="ct-card__body">
@@ -179,7 +181,7 @@ export default function RoutesSchedulesPage() {
                   <thead>
                     <tr>
                       <th>Day</th>
-                      <th>Waste Type</th>
+                      <th>Collection</th>
                       <th>Time Window</th>
                       <th className="is-right">Edit</th>
                     </tr>
@@ -191,18 +193,22 @@ export default function RoutesSchedulesPage() {
                           <strong>{entry.day}</strong>
                           {entry.day === today && <small>Today</small>}
                         </td>
-                        <td>{entry.wasteType === 'No collection' ? <span className="ct-tag">No collection</span> : entry.wasteType}</td>
+                        <td>{isCollectionDay(entry.day) ? <StatusBadge tone="green">Collection day</StatusBadge> : <span className="ct-tag">No collection</span>}</td>
                         <td>{entry.window}</td>
                         <td>
                           <div className="ct-table__actions">
-                            <button
-                              type="button"
-                              className="ct-icon-btn"
-                              aria-label={`Edit ${entry.day}`}
-                              onClick={() => setModal({ type: 'day', entry })}
-                            >
-                              <Pencil size={16} />
-                            </button>
+                            {isCollectionDay(entry.day) ? (
+                              <button
+                                type="button"
+                                className="ct-icon-btn"
+                                aria-label={`Edit ${entry.day}`}
+                                onClick={() => setModal({ type: 'day', entry })}
+                              >
+                                <Pencil size={16} />
+                              </button>
+                            ) : (
+                              <small>Not a collection day</small>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -212,6 +218,8 @@ export default function RoutesSchedulesPage() {
               </div>
             </div>
           </article>
+
+          <ScheduleExceptionsCard />
         </div>
 
         <DetailPanel

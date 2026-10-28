@@ -5,6 +5,7 @@ import ToggleRow from '../../components/ToggleRow.jsx'
 import SignOutButton from '../../components/SignOutButton.jsx'
 import ChangePasswordModal from '../../components/ChangePasswordModal.jsx'
 import EditProfileModal from '../components/EditProfileModal.jsx'
+import AvatarPicker from '../../components/AvatarPicker.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useResident } from '../../auth/useAccount.js'
 import { useToast } from '../../components/toast/toastContext.js'
@@ -29,17 +30,30 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const update = (patch) => dispatch({ type: 'resident/update', payload: { id: resident.id, patch } })
   const activePrefs = Object.values(resident.prefs).filter(Boolean).length
+  const [photoSaving, setPhotoSaving] = useState(false)
+
+  function setPhoto(photo) {
+    setPhotoSaving(true)
+    update({ photo }).then((res) => {
+      setPhotoSaving(false)
+      if (res.ok) toast(photo ? 'Profile picture saved' : 'Profile picture removed')
+    })
+  }
 
   return (
     <div className="m-page">
-      <section className="m-card m-card--accent m-row">
-        <span className="ct-avatar res-profile-avatar">{resident.initials}</span>
-        <div className="m-grow">
-          <strong>{resident.name}</strong>
-          <div>
-            <StatusBadge tone="green">Resident</StatusBadge>
+      <section className="m-card m-card--accent">
+        <div className="m-row">
+          <div className="m-grow">
+            <strong>{resident.name}</strong>
+            <div>
+              <StatusBadge tone="green">Resident</StatusBadge>
+            </div>
+            <p className="m-muted">{resident.email || resident.phone}</p>
           </div>
-          <p className="m-muted">{resident.email || resident.phone}</p>
+        </div>
+        <div className="res-gap">
+          <AvatarPicker value={resident.photo ?? null} onChange={setPhoto} initials={resident.initials} name={resident.name} busy={photoSaving} size={64} />
         </div>
       </section>
 

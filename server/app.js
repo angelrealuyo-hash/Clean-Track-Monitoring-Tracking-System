@@ -16,6 +16,7 @@ import { getSecret, hashPassword, signToken, verifyPassword, verifyToken } from 
 import { findAccount, getAccountByRef, recentLocations, updateAccount } from './repository.js'
 import { emailLog, emailConfig } from './email.js'
 import { HttpError } from './policy.js'
+import { canViewImage, getImage } from './uploads.js'
 import { demoUsers } from '../src/data/users.js'
 import { normalizePhone } from '../src/utils/validate.js'
 
@@ -124,6 +125,16 @@ export function createApi({ db = openDatabase(), tickMs = 15_000 } = {}) {
       off()
       clearInterval(ping)
     })
+  })
+
+  // ---------- Images (report photos, profile pictures) ----------
+  // Only for signed-in users allowed to see that image (never public).
+  api.get('/images/:id', requireUser(), (req, res) => {
+    const row = getImage(db, req.params.id)
+    if (!row) return res.status(404).json({ error: 'Image not found.' })
+    if (!canViewImage(req.user, row, service.state)) return res.status(403).json({ error: 'You are not allowed to see this image.' })
+    res.set({ 'Content-Type': row.mime, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' })
+    res.send(Buffer.from(row.data))
   })
 
   // ---------- Admin tools ----------

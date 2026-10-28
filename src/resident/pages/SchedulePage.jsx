@@ -1,35 +1,60 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, BellRing, Clock, Info, MapPin, ShieldCheck, Truck } from 'lucide-react'
+import { ArrowRight, BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleX, Info, MapPin, SkipForward, Truck } from 'lucide-react'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import ToggleRow from '../../components/ToggleRow.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useResident } from '../../auth/useAccount.js'
 import { barangay } from '../../data/barangay.js'
-import { plainWaste } from '../../data/plainWords.js'
+import { dayOfDate, exceptionKinds, scheduleLabel } from '../../data/schedule.js'
+import { calendarLegend, dayStatus } from '../../data/calendarStatus.js'
+import { feedbackReasonLabel } from '../../data/collectionFeedback.js'
+import { formatDate, localDateISO, todayISO } from '../../utils/format.js'
 import './ResidentPages.css'
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const ICONS = { scheduled: Truck, done: CircleCheck, skipped: SkipForward, missed: CircleX, holiday: CircleAlert }
+const TONES = { scheduled: 'green', done: 'green', skipped: 'gray', missed: 'red', holiday: 'amber' }
+const LEGEND_ORDER = ['scheduled', 'done', 'skipped', 'missed', 'holiday']
 
-// What goes in which bin (RA 9003 segregation at source).
-const guide = [
-  { type: 'Food & garden waste', color: '#22a565', bin: 'Own bag', items: 'Food scraps, fruit and vegetable peelings, leaves, garden waste.' },
-  { type: 'Recyclables', color: '#2563eb', bin: 'Own bag', items: 'Clean plastic bottles, cartons, paper, cans and metals.' },
-  { type: 'Other trash', color: '#5d6e64', bin: 'Own bag', items: 'Diapers, sanitary pads, candy wrappers, styrofoam.' },
-  { type: 'Batteries & electronics', color: '#c4231f', bin: 'Drop-off only', items: 'Batteries, bulbs, old phones, chemicals, paint. Bring to the barangay drop-off.' },
-]
+const iso = (y, m, d) => localDateISO(new Date(y, m, d))
+const monthName = (y, m) => new Date(y, m, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
 
-// PDF page 42
+// Pickup Days: a month calendar with an icon on each pickup day, from saved
+// records (the resident's Pick Up Check answers and the admin's holidays).
 export default function SchedulePage() {
   const { data, dispatch } = useData()
   const resident = useResident()
-  const [tab, setTab] = useState('week')
-  // Read once when the page opens (not on every redraw).
-  const [todayIndex] = useState(() => new Date().getDay())
+  const today = todayISO()
+  const [view, setView] = useState(() => {
+    const d = new Date(`${today}T00:00`)
+    return { y: d.getFullYear(), m: d.getMonth() }
+  })
+  const [selected, setSelected] = useState(today)
 
-  // This week, starting today.
-  const days = Array.from({ length: 7 }, (_, i) => DAYS[(todayIndex + i) % 7])
-  const runs = days.map((day, i) => ({ ...data.weeklySchedule.find((d) => d.day === day), offset: i }))
+  // Days a Pick Up Check was sent (from the saved notifications).
+  const checkDates = new Set(data.notifications.filter((n) => n.kind === 'pickup-check' && n.key).map((n) => n.key.replace('pickup-check-', '')))
+  const ctx = {
+    today,
+    exceptions: data.scheduleExceptions ?? [],
+    feedback: data.collectionFeedback ?? [],
+    checkDates,
+    since: resident.createdAt ? localDateISO(resident.createdAt) : '',
+  }
+
+  // Calendar cells: blanks before the 1st, then each day of the month.
+  const first = new Date(view.y, view.m, 1).getDay()
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate()
+  const cells = [...Array(first).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => iso(view.y, view.m, i + 1))]
+  const move = (delta) => setView(({ y, m }) => ({ y: m + delta < 0 ? y - 1 : m + delta > 11 ? y + 1 : y, m: (m + delta + 12) % 12 }))
+  const goToday = () => {
+    const d = new Date(`${today}T00:00`)
+    setView({ y: d.getFullYear(), m: d.getMonth() })
+    setSelected(today)
+  }
+
+  const sel = dayStatus(selected, ctx)
+  const pickupWindow = data.weeklySchedule.find((d) => d.day === dayOfDate(selected))?.window
 
   function setReminders(value) {
     dispatch({ type: 'resident/update', payload: { id: resident.id, patch: { prefs: { ...resident.prefs, scheduleReminders: value } } } })
@@ -38,96 +63,135 @@ export default function SchedulePage() {
   return (
     <div className="m-page">
       <div>
-        <div className="m-row m-row--between">
-          <h1 className="m-h1">Pickup Days</h1>
-          <StatusBadge tone="green">This week</StatusBadge>
-        </div>
+        <h1 className="m-h1">Pickup Days</h1>
         <p className="m-muted">
           <MapPin size={11} /> {resident.purok}
         </p>
       </div>
 
       <div className="ct-alert">
-        <ShieldCheck size={15} />
-        <span>Please separate your trash before pickup (required by law, RA 9003)</span>
+        <CalendarDays size={15} />
+        <span>
+          The garbage truck comes on <strong>{scheduleLabel}</strong> only. Put your tied garbage bags out before the pickup time.
+        </span>
       </div>
 
-      <div className="m-chips" role="group" aria-label="View">
-        <button type="button" aria-pressed={tab === 'week'} onClick={() => setTab('week')}>
-          This week
+      <section className="m-card res-cal" aria-label="Pickup calendar">
+        <div className="res-cal__head">
+          <button type="button" className="ct-icon-btn" onClick={() => move(-1)} aria-label="Previous month">
+            <ChevronLeft size={18} />
+          </button>
+          <strong aria-live="polite">{monthName(view.y, view.m)}</strong>
+          <button type="button" className="ct-icon-btn" onClick={() => move(1)} aria-label="Next month">
+            <ChevronRight size={18} />
+          </button>
+        </div>
+        <button type="button" className="res-cal__today" onClick={goToday}>
+          Today
         </button>
-        <button type="button" aria-pressed={tab === 'guide'} onClick={() => setTab('guide')}>
-          How to separate
-        </button>
-      </div>
 
-      {tab === 'week' ? (
-        <>
-          <section className="m-card">
-            <ToggleRow
-              icon={BellRing}
-              label="Remind me on pickup days"
-              hint="A reminder will show in this app."
-              checked={resident.prefs.scheduleReminders}
-              onChange={setReminders}
-            />
-          </section>
-
-          <div className="m-row m-row--between">
-            <h2 className="m-section-title">Pickups this week</h2>
-            <span className="m-muted">{data.weeklySchedule.filter((d) => d.wasteType !== 'No collection').length} pickup days</span>
-          </div>
-
-          {runs.map((run) => {
-            const none = run.wasteType === 'No collection'
-            const badge = run.offset === 0 ? ['green', 'Today'] : run.offset === 1 ? ['blue', 'Tomorrow'] : ['gray', run.day]
+        <div className="res-cal__grid" role="grid">
+          {WEEKDAYS.map((w) => (
+            <span key={w} className="res-cal__wd" role="columnheader">
+              {w}
+            </span>
+          ))}
+          {cells.map((d, i) => {
+            if (!d) return <span key={`b${i}`} aria-hidden="true" />
+            const st = dayStatus(d, ctx)
+            const Icon = st ? ICONS[st.status] : null
+            const label = `${formatDate(d)}${d === today ? ' (today)' : ''}: ${st ? calendarLegend[st.status] : 'No pickup'}`
             return (
-              <article key={run.day} className={`m-card res-run ${run.offset === 0 ? 'is-today' : ''} ${none ? 'is-none' : ''}`}>
-                <div className="m-row m-row--between">
-                  <StatusBadge tone={badge[0]}>{badge[1]}</StatusBadge>
-                  <span className="m-muted">
-                    <Clock size={11} /> {none ? 'No pickup' : run.window}
-                  </span>
-                </div>
-                <h3>{none ? 'No pickup' : plainWaste(run.wasteType)}</h3>
-                {!none && (
-                  <p className="m-muted">
-                    <Truck size={11} /> Truck {data.truck.id} · {run.day}
-                  </p>
-                )}
-                {run.offset === 0 && !none && (
-                  <Link to="/resident/track" className="ct-btn ct-btn--primary ct-btn--block res-gap">
-                    See where the truck is <ArrowRight size={15} />
-                  </Link>
-                )}
-              </article>
+              <button
+                key={d}
+                type="button"
+                role="gridcell"
+                className={`res-cal__day ${st ? `is-${st.status}` : 'is-none'} ${d === today ? 'is-today' : ''} ${d === selected ? 'is-selected' : ''}`}
+                aria-label={label}
+                aria-selected={d === selected}
+                title={label}
+                onClick={() => setSelected(d)}
+              >
+                <span className="res-cal__num">{Number(d.slice(8))}</span>
+                {Icon && <Icon size={15} aria-hidden="true" />}
+              </button>
             )
           })}
+        </div>
 
-          <section className="m-card m-row">
-            <span className="m-icon">
-              <Info size={16} />
-            </span>
-            <div className="m-grow">
-              <strong>Big items to throw away?</strong>
-              <p className="m-muted">For old furniture or many branches, call the Barangay office at {barangay.hotline}.</p>
-            </div>
-          </section>
-        </>
-      ) : (
-        guide.map((g) => (
-          <article key={g.type} className="m-card m-row m-row--top">
-            <span className="res-guide-swatch" style={{ background: g.color }} aria-hidden="true" />
-            <div className="m-grow">
-              <div className="m-row m-row--between">
-                <strong>{g.type}</strong>
-                <span className="ct-tag">{g.bin}</span>
-              </div>
-              <p className="m-muted">{g.items}</p>
-            </div>
-          </article>
-        ))
-      )}
+        <ul className="res-cal__legend" aria-label="What the icons mean">
+          {LEGEND_ORDER.map((k) => {
+            const Icon = ICONS[k]
+            return (
+              <li key={k} className={`is-${k}`}>
+                <Icon size={14} aria-hidden="true" /> {calendarLegend[k]}
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      {/* The chosen date */}
+      <section className="m-card" aria-live="polite">
+        <div className="m-row m-row--between">
+          <strong>
+            {formatDate(selected)} · {dayOfDate(selected)}
+          </strong>
+          {selected === today && <StatusBadge tone="blue">Today</StatusBadge>}
+        </div>
+        {!sel ? (
+          <p className="m-muted res-gap">No pickup on this day. Pickup days are {scheduleLabel}.</p>
+        ) : (
+          <>
+            <p className="res-gap">
+              <StatusBadge tone={TONES[sel.status]}>{calendarLegend[sel.status]}</StatusBadge>
+            </p>
+            {sel.status === 'holiday' ? (
+              <p className="m-muted">
+                {exceptionKinds[sel.exception.kind]}: {sel.exception.reason}. The truck does not come on this day.
+              </p>
+            ) : (
+              <p className="m-muted">
+                <Truck size={11} /> Truck {data.truck.id} · pickup {pickupWindow}
+              </p>
+            )}
+            {sel.answer && (
+              <ul className="res-fb-summary">
+                <li>Planning to dispose: {sel.answer.willDispose ? 'Yes' : 'No'}</li>
+                {sel.answer.truckPassed !== null && <li>Truck passed your location: {sel.answer.truckPassed ? 'Yes' : 'No'}</li>}
+                {sel.answer.disposed !== null && <li>Able to dispose: {sel.answer.disposed ? 'Yes' : 'No'}</li>}
+                {sel.answer.reason && <li>Reason: {feedbackReasonLabel(sel.answer.reason)}</li>}
+              </ul>
+            )}
+            {sel.unanswered && <p className="m-muted">The Pick Up Check for this day was not answered.</p>}
+            {selected === today && sel.status !== 'holiday' && (
+              <Link to="/resident/track" className="ct-btn ct-btn--primary ct-btn--block res-gap">
+                See where the truck is <ArrowRight size={15} />
+              </Link>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="m-card">
+        <ToggleRow
+          icon={BellRing}
+          label="Remind me on pickup days"
+          hint="A reminder will show in this app."
+          checked={resident.prefs.scheduleReminders}
+          onChange={setReminders}
+        />
+      </section>
+
+      <section className="m-card m-row">
+        <span className="m-icon">
+          <Info size={16} />
+        </span>
+        <div className="m-grow">
+          <strong>Big items to throw away?</strong>
+          <p className="m-muted">For old furniture or many branches, call the Barangay office at {barangay.hotline}.</p>
+        </div>
+      </section>
     </div>
   )
 }

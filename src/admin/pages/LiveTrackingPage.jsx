@@ -10,7 +10,8 @@ import LocationLogCard from '../components/LocationLogCard.jsx'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { STATUS_LABELS, STATUS_TONES } from '../../services/trackingSimulation.js'
 import { useData } from '../../store/dataContext.js'
-import { formatCoords, formatTime } from '../../utils/format.js'
+import { formatCoords, formatTime, todayISO } from '../../utils/format.js'
+import { exceptionOn, isPickupDate, scheduleLabel } from '../../data/schedule.js'
 import '../components/AdminPage.css'
 import './LiveTrackingPage.css'
 
@@ -47,6 +48,13 @@ export default function LiveTrackingPage() {
           <h1>Live Tracking</h1>
         </div>
         <div className="admin-page__actions">
+          <StatusBadge tone={isPickupDate(todayISO(), data.scheduleExceptions) ? 'green' : 'gray'}>
+            {isPickupDate(todayISO(), data.scheduleExceptions)
+              ? 'Collection day today'
+              : exceptionOn(todayISO(), data.scheduleExceptions)
+                ? `No collection today · ${exceptionOn(todayISO(), data.scheduleExceptions).reason}`
+                : `No collection today · ${scheduleLabel}`}
+          </StatusBadge>
           <StatusBadge tone="amber">SIMULATED GPS — DEMO MODE</StatusBadge>
           <SimulationControls />
         </div>

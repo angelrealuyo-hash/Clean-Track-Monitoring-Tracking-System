@@ -76,3 +76,31 @@ test('resident report -> admin resolves -> resident notified', () => {
   const note = notificationsForResident(s.notifications, s.residents[0]).find((x) => x.title.includes('REP-T-1'))
   assert.ok(note)
 })
+
+test('resident calendar status follows the saved records', async () => {
+  const { dayStatus } = await import('../src/data/calendarStatus.js')
+  // 2026-10-26 Mon, 27 Tue, 28 Wed (today), 30 Fri, 2026-11-02 Mon
+  const ctx = {
+    today: '2026-10-28',
+    exceptions: [{ date: '2026-11-02', kind: 'holiday', reason: 'All Souls' }],
+    feedback: [
+      { date: '2026-10-21', willDispose: true, truckPassed: true, disposed: true },
+      { date: '2026-10-19', willDispose: false, truckPassed: null, disposed: null },
+      { date: '2026-10-16', willDispose: true, truckPassed: false, disposed: false, reason: 'truck-did-not-pass' },
+      { date: '2026-10-30', willDispose: true, truckPassed: null, disposed: null },
+    ],
+    checkDates: new Set(['2026-10-23', '2026-10-26', '2026-10-28', '2026-10-30']),
+    since: '2026-10-01',
+  }
+  const s = (d) => dayStatus(d, ctx)?.status ?? null
+  assert.equal(s('2026-10-27'), null, 'Tuesday: not a pickup day')
+  assert.equal(s('2026-10-21'), 'done')
+  assert.equal(s('2026-10-19'), 'skipped')
+  assert.equal(s('2026-10-16'), 'missed', 'said they could not dispose')
+  assert.equal(s('2026-10-26'), 'missed', 'check sent, day passed, no answer')
+  assert.equal(s('2026-10-14'), 'scheduled', 'past day without a check: no false X')
+  assert.equal(s('2026-10-28'), 'scheduled', 'today, not answered yet: no X')
+  assert.equal(s('2026-10-30'), 'scheduled', 'future: never X')
+  assert.equal(s('2026-11-02'), 'holiday', 'holiday wins over the truck')
+  assert.equal(dayStatus('2026-10-23', { ...ctx, since: '2026-10-25' }).status, 'scheduled', 'before the resident joined')
+})

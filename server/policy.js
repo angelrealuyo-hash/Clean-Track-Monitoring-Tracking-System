@@ -8,8 +8,11 @@ import { userKeyOf } from '../src/store/view.js'
 import { normalizePhone } from '../src/utils/validate.js'
 import { reportCategories } from '../src/data/reports.js'
 import { maintenanceTypes } from '../src/data/truck.js'
-import { wasteTypes } from '../src/data/routes.js'
+import { COLLECTION, exceptionKinds, exceptionOn, isCollectionDate, isCollectionDay, isPickupDate, scheduleLabel } from '../src/data/schedule.js'
 import { barangay } from '../src/data/barangay.js'
+import { feedbackReasons } from '../src/data/collectionFeedback.js'
+import { crewRoles } from '../src/data/crew.js'
+import { todayISO, todayName } from '../src/utils/format.js'
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -60,6 +63,16 @@ const phone = (v, label = 'Mobile number') => {
   return p
 }
 const time12 = /^\d{2}:\d{2} (AM|PM)$/
+const isRef = (v) => typeof v === 'string' && /^upl:[a-f0-9]{32}$/.test(v)
+
+// Profile pictures: a new image (data URL), null to remove, or the current
+// picture unchanged ("upl:<id>" it already had).
+const profilePhoto = (v, current) => {
+  if (v === undefined) return undefined
+  if (v === null || v === '') return null
+  if (isRef(v) && v === current) return v
+  return photo(v)
+}
 
 const ROLE_ACTIONS = {
   admin: new Set([
@@ -69,6 +82,8 @@ const ROLE_ACTIONS = {
     'schedule/update',
     'run/start', 'run/end', 'collection/mark', 'collection/clear', 'collection/clearAll',
     'report/update', 'broadcast/add', 'settings/update',
+    'crew/add', 'crew/update', 'crew/delete', 'admin/setPhoto',
+    'schedule/addException', 'schedule/removeException',
     'notification/markRead', 'notification/markAllRead',
     'sim/start', 'sim/pause', 'sim/resume', 'sim/stop', 'sim/reset',
   ]),
@@ -77,7 +92,7 @@ const ROLE_ACTIONS = {
     'notification/markRead', 'notification/markAllRead',
     'sim/start', 'sim/pause', 'sim/resume', 'sim/stop',
   ]),
-  resident: new Set(['report/add', 'resident/update', 'notification/markRead', 'notification/markAllRead']),
+  resident: new Set(['report/add', 'feedback/submit', 'resident/update', 'notification/markRead', 'notification/markAllRead']),
 }
 
 const runActive = (state) => Boolean(state.activeRunId)
@@ -148,6 +163,7 @@ export function prepareAction(state, user, action) {
         shift: str(p.shift, 'Shift', { max: 60 }),
         status: oneOf(p.status ?? 'standby', ['on-shift', 'standby', 'off-duty'], 'Availability'),
         ...(e ? { email: e } : {}),
+        photo: profilePhoto(p.photo, null) ?? null,
       }
       if (p.password) {
         if (!e) fail('Add an email so the driver can sign in.')
@@ -171,6 +187,7 @@ export function prepareAction(state, user, action) {
       if ('phone' in patchIn) patch.phone = phone(patchIn.phone)
       if ('license' in patchIn) patch.license = str(patchIn.license, 'License type', { max: 60 })
       if ('shift' in patchIn) patch.shift = str(patchIn.shift, 'Shift', { max: 60 })
+      if ('photo' in patchIn) patch.photo = profilePhoto(patchIn.photo, target.photo ?? null)
       if ('email' in patchIn) {
         const e = email(patchIn.email, 'Driver email')
         patch.email = e
@@ -233,26 +250,33 @@ export function prepareAction(state, user, action) {
       if (!state.route.stops.some((s) => s.id === p.id)) fail('That stop does not exist.', 404)
       return out(action.type === 'route/moveStop' ? { id: p.id, dir: p.dir === -1 ? -1 : 1 } : { id: p.id })
     case 'schedule/update': {
-      if (!state.weeklySchedule.some((d) => d.day === p.day)) fail('That day does not exist.')
-      const wasteType = oneOf(p.patch?.wasteType, wasteTypes, 'Waste type')
-      const window = wasteType === 'No collection' ? '-' : str(p.patch?.window, 'Time window', { max: 25 })
-      if (window !== '-') {
-        const [a, b] = window.split(' - ')
-        if (!time12.test(a ?? '') || !time12.test(b ?? '')) fail('Time window is not valid.')
-      }
-      return out({ day: p.day, patch: { wasteType, window } })
+      // Regular collection is only on the official days; only their time can change.
+      if (!isCollectionDay(p.day)) fail(`Regular collection is only on ${scheduleLabel}.`)
+      const window = str(p.patch?.window, 'Time window', { max: 25 })
+      const [a, b] = window.split(' - ')
+      if (!time12.test(a ?? '') || !time12.test(b ?? '')) fail('Time window is not valid.')
+      return out({ day: p.day, patch: { wasteType: COLLECTION, window } })
     }
 
     // ---------- Collection runs ----------
     case 'run/start': {
       requireAssignedDriver()
+      if (user.role === 'driver' && !isCollectionDay(todayName()))
+        fail(`No collection today. Regular routes run on ${scheduleLabel} only.`, 409)
+      if (user.role === 'driver' && !isPickupDate(todayISO(), state.scheduleExceptions))
+        fail(`No collection today: ${exceptionOn(todayISO(), state.scheduleExceptions).reason}.`, 409)
       if (state.truck.status === 'maintenance') fail(`Truck ${state.truck.id} is in maintenance. The route cannot start.`, 409)
       if (!state.route.stops.some(isCollectionStop)) fail('The route has no pickup points.', 409)
       return out(user.role === 'driver' ? { by: 'driver', driverId: user.refId } : { by: 'admin' })
     }
-    case 'run/end':
+    case 'run/end': {
       requireAssignedDriver()
+      // The driver ends the shift only after every stop is collected; the office may end a route any time.
+      const run = state.runs.find((r) => r.id === state.activeRunId)
+      if (user.role === 'driver' && run && !run.stops.every((s) => run.results[s.id]?.status === 'collected'))
+        fail('Mark every stop as collected before ending your shift.', 409)
       return out({})
+    }
     case 'collection/mark': {
       requireAssignedDriver()
       const stop = state.route.stops.find((s) => s.id === p.stopId)
@@ -265,7 +289,8 @@ export function prepareAction(state, user, action) {
         stopId: p.stopId,
         status,
         note,
-        bags: p.bags === undefined || p.bags === null ? null : int(p.bags, 'Bags', 0, 500),
+        // Bag counts are no longer recorded: a stop record only says the stop was done.
+        bags: null,
         by: user.role,
         byName: user.role === 'driver' ? driver?.name ?? 'Driver' : user.name ?? 'Barangay office',
       })
@@ -281,18 +306,20 @@ export function prepareAction(state, user, action) {
       return out({})
     case 'driver/reportIssue': {
       requireAssignedDriver()
-      const stop = state.route.stops.find((s) => s.id === p.stopId)
-      if (!stop) fail('That stop does not exist.', 404)
+      // The stop is optional: a problem can happen on the road or at the depot.
+      const stop = p.stopId ? state.route.stops.find((s) => s.id === p.stopId) : null
+      if (p.stopId && !stop) fail('That stop does not exist.', 404)
       const driver = state.drivers.find((d) => d.id === user.refId)
       return out({
-        stopId: stop.id,
-        stopName: stop.name,
+        stopId: stop?.id ?? null,
+        stopName: stop?.name ?? null,
+        driverId: user.role === 'driver' ? user.refId : state.truck.driverId,
         issueType: str(p.issueType ?? 'other', 'Issue type', { max: 30 }),
         issueLabel: str(p.issueLabel, 'Issue type', { max: 60 }),
         description: str(p.description, 'Description', { min: 10, max: 250 }),
         photo: photo(p.photo),
         notifyDispatch: Boolean(p.notifyDispatch),
-        markMissed: Boolean(p.markMissed),
+        markMissed: Boolean(p.markMissed && stop && isCollectionStop(stop)),
         driverName: driver?.name ?? 'Driver',
       })
     }
@@ -316,6 +343,106 @@ export function prepareAction(state, user, action) {
         smsUpdates: Boolean(p.smsUpdates),
       })
     }
+    case 'schedule/addException': {
+      const date = String(p.date ?? '')
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00`))) fail('Choose a valid date.')
+      if (!isCollectionDate(date)) fail(`Only ${scheduleLabel} have pickups, so only those dates can be a holiday or suspension.`)
+      if (date < todayISO()) fail('Choose today or a future date.')
+      return out({ date, kind: oneOf(p.kind, Object.keys(exceptionKinds), 'Type'), reason: str(p.reason, 'Reason', { min: 3, max: 80 }) })
+    }
+    case 'schedule/removeException':
+      if (!(state.scheduleExceptions ?? []).some((x) => x.date === p.date)) fail('That date is not on the list.', 404)
+      return out({ date: p.date })
+
+    case 'admin/setPhoto':
+      return out({ photo: profilePhoto(p.photo ?? null, state.adminPhoto ?? null) })
+
+    // ---------- Truck crew (admin) ----------
+    case 'crew/add':
+    case 'crew/update': {
+      const editing = action.type === 'crew/update'
+      const current = editing ? (state.crew ?? []).find((c) => c.id === p.id) : null
+      if (editing && !current) fail('That crew member does not exist.', 404)
+      const f = editing ? (p.patch ?? {}) : p
+      const truckId = f.truckId || null
+      if (truckId && truckId !== state.truck.id) fail('That truck does not exist.')
+      const member = {
+        name: str(f.name, 'Name', { min: 3, max: 60 }).replace(/\s+/g, ' '),
+        role: oneOf(f.role, crewRoles, 'Role'),
+        phone: f.phone && String(f.phone).trim() ? phone(f.phone) : '',
+        truckId,
+        status: oneOf(f.status ?? 'active', ['active', 'inactive'], 'Status'),
+        ...('photo' in f ? { photo: profilePhoto(f.photo, current?.photo ?? null) } : editing ? {} : { photo: null }),
+      }
+      return out(editing ? { id: p.id, patch: member } : member)
+    }
+    case 'crew/delete':
+      if (!(state.crew ?? []).some((c) => c.id === p.id)) fail('That crew member does not exist.', 404)
+      return out({ id: p.id })
+
+    // ---------- Resident pickup feedback ----------
+    // Answers are saved step by step. Each answer is stored as given: "I will
+    // put it out" is never counted as "I put it out".
+    case 'feedback/submit': {
+      const resident = state.residents.find((r) => r.id === user.refId)
+      if (!resident) fail('Your account was not found.', 404)
+      // Answers are always for TODAY, and only on an official collection day.
+      if (!isCollectionDay(todayName())) fail(`There is no garbage pickup today (pickup days: ${scheduleLabel}).`, 409)
+      if (!isPickupDate(todayISO(), state.scheduleExceptions)) fail('There is no garbage pickup today (holiday or suspension).', 409)
+      const yesNo = (v, label) => {
+        if (v === null || v === undefined) return null
+        if (typeof v !== 'boolean') fail(`${label} must be Yes or No.`)
+        return v
+      }
+      const willDispose = yesNo(p.willDispose, 'Answer')
+      if (willDispose === null) fail('Choose Yes or No.')
+      let truckPassed = yesNo(p.truckPassed, 'Answer')
+      let disposed = yesNo(p.disposed, 'Answer')
+      if (!willDispose) truckPassed = disposed = null
+      if (truckPassed === null) disposed = null
+      let reason = null
+      let reasonText = ''
+      if (disposed === false) {
+        const r = feedbackReasons.find((x) => x.id === p.reason)
+        if (!r || (r.whenTruckPassed !== undefined && r.whenTruckPassed !== truckPassed)) fail('Choose why you could not put out your garbage.')
+        reason = r.id
+        reasonText = typeof p.reasonText === 'string' ? p.reasonText.trim().slice(0, 250) : ''
+        if (r.id === 'other' && reasonText.length < 3) fail('Please tell us the reason in a few words.')
+      }
+      // The truck "did not pass" answer comes with the reason form, which means
+      // the resident could not put the garbage out.
+      if (truckPassed === false && disposed === true) fail('Answer is not valid.')
+      const date = todayISO()
+      const run = state.runs.find((r) => r.date === date && r.id === state.activeRunId) ?? state.runs.find((r) => r.date === date)
+      const reasonDef = feedbackReasons.find((x) => x.id === reason)
+      const category = reasonDef?.report ? reportCategories.find((c) => c.id === reasonDef.report) : null
+      return out({
+        residentId: resident.id,
+        residentName: resident.name,
+        purok: resident.purok,
+        date,
+        runId: run?.id ?? null,
+        willDispose,
+        truckPassed,
+        disposed,
+        reason,
+        reasonText,
+        report: category
+          ? {
+              residentId: resident.id,
+              residentName: resident.name,
+              residentPhone: resident.phone,
+              category: category.id,
+              categoryLabel: category.label,
+              location: resident.address || resident.purok,
+              description: `Pickup feedback (${date}): ${reasonDef.label}.${reasonText ? ` ${reasonText}` : ''}`.slice(0, 250),
+              photo: null,
+              smsUpdates: false,
+            }
+          : null,
+      })
+    }
+
     case 'report/update': {
       const report = state.reports.find((r) => r.id === p.id)
       if (!report) fail('That report does not exist.', 404)
@@ -347,6 +474,7 @@ export function prepareAction(state, user, action) {
       }
       if ('address' in patchIn) patch.address = str(patchIn.address, 'Address', { min: 3, max: 120 })
       if ('purok' in patchIn) patch.purok = oneOf(patchIn.purok, barangay.puroks, 'Purok')
+      if ('photo' in patchIn) patch.photo = profilePhoto(patchIn.photo, state.residents.find((r) => r.id === user.refId)?.photo ?? null)
       if ('prefs' in patchIn) {
         const prefs = patchIn.prefs ?? {}
         patch.prefs = Object.fromEntries(['email', 'push', 'scheduleReminders', 'truckNearby'].map((k) => [k, Boolean(prefs[k])]))
@@ -388,6 +516,13 @@ export function prepareAction(state, user, action) {
       if ('simulationIntervalMs' in p) patch.simulationIntervalMs = Number(oneOf(Number(p.simulationIntervalMs), [1000, 2000, 5000], 'Update interval'))
       if ('autoProximityAlerts' in p) patch.autoProximityAlerts = Boolean(p.autoProximityAlerts)
       if ('autoScheduleReminders' in p) patch.autoScheduleReminders = Boolean(p.autoScheduleReminders)
+      if ('autoPickupCheck' in p) patch.autoPickupCheck = Boolean(p.autoPickupCheck)
+      // Optional; empty means "not set" and the Driver app says so.
+      if ('officePhone' in p) {
+        const raw = typeof p.officePhone === 'string' ? p.officePhone.trim() : ''
+        if (raw && !/^\+?[\d\s()-]{7,20}$/.test(raw)) fail('Office phone may only contain digits, spaces, ( ) - and +.')
+        patch.officePhone = raw
+      }
       return out(patch)
     }
     case 'sim/start':

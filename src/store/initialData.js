@@ -19,6 +19,10 @@ export const defaultSettings = {
   simulationIntervalMs: 1000, // how often the demo truck moves
   autoProximityAlerts: true, // in-app "truck is coming" message per purok
   autoScheduleReminders: true, // in-app "pickup today" message on pickup days
+  autoPickupCheck: true, // in-app "Today's Pick Up Check!" question on pickup days
+  // Office number for the Driver app's "Call the Office" button. Empty until
+  // the admin enters the real number in Settings (no number is made up).
+  officePhone: '',
 }
 
 const clone = (v) => structuredClone(v)
@@ -32,6 +36,8 @@ export function createInitialData() {
     drivers: clone(drivers),
     route: clone(route),
     weeklySchedule: clone(weeklySchedule),
+    // Holidays / suspended pickup dates (none until the admin adds them).
+    scheduleExceptions: [],
     // Resident accounts. The demo resident is first; "Create Account" adds more.
     // Resident profiles. Passwords are NOT stored here: sign-in accounts live in
     // the server's accounts table with hashed passwords.
@@ -58,6 +64,13 @@ export function createInitialData() {
     // Each run keeps every pickup point's result, so history and analytics
     // come from real records instead of made-up numbers.
     runs: [],
+    // Resident answers to "Will you put out your garbage today?" (one per
+    // resident per pickup date). What residents SAID, not confirmed pickups.
+    collectionFeedback: [],
+    // Problems reported by the driver (from Home or a stop).
+    driverIssues: [],
+    // Truck crew members besides the driver (Admin → Crew Management).
+    crew: [],
     activeRunId: null,
     // Demo truck controls (the position is calculated from these + the clock).
     simulation: { ...IDLE_CONTROL },

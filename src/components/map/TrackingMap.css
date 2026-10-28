@@ -1,5 +1,8 @@
 .ct-map {
   position: relative;
+  /* Keep Leaflet's layers (z-index 400+) inside the map, so sticky headers
+     and bars are never covered when the page scrolls. */
+  isolation: isolate;
   overflow: hidden;
   background: #e6efe9;
   border-radius: var(--ct-radius);

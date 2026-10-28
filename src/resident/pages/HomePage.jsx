@@ -16,18 +16,12 @@ import TrackingMap from '../../components/map/TrackingMap.jsx'
 import ErrorBoundary from '../../components/ErrorBoundary.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useTruckForResident } from '../components/useTruckForResident.js'
+import CollectionFeedbackCard from '../components/CollectionFeedbackCard.jsx'
 import { notificationsForResident } from '../../store/selectors.js'
 import { formatDateTime } from '../../utils/format.js'
-import { plainWaste } from '../../data/plainWords.js'
+import { scheduleLabel } from '../../data/schedule.js'
+import Avatar from '../../components/Avatar.jsx'
 import './ResidentPages.css'
-
-// Short collection tip per waste type.
-const tips = {
-  'Biodegradable (Kitchen & Yard Waste)': 'Put your tied bags of food and garden waste outside your gate before the truck comes.',
-  'Recyclables (Plastics, Cartons, Metals)': 'Rinse and flatten bottles, boxes and cans. Put them in a separate bag.',
-  'Residual Non-Recyclable Waste': 'Tie your trash bag well. Do not mix in food scraps.',
-  'Hazardous & Electronic Waste (Drop-off)': 'Bring old batteries and phones to the Barangay drop-off point.',
-}
 
 // PDF page 36
 export default function HomePage() {
@@ -36,13 +30,13 @@ export default function HomePage() {
   const truck = data.truck
   const driver = data.drivers.find((d) => d.id === truck.driverId)
   const firstName = resident.name.split(' ')[0]
-  const advisory = notificationsForResident(data.notifications, resident).find((n) => n.zone)
+  const advisory = notificationsForResident(data.notifications, resident).find((n) => n.zone && n.kind !== 'pickup-check')
   const street = resident.address.split(',')[0]
 
   return (
     <div className="m-page">
       <section className="m-card m-row">
-        <span className="ct-avatar">{resident.initials}</span>
+        <Avatar photo={resident.photo} initials={resident.initials} name={resident.name} />
         <div className="m-grow">
           <strong>Magandang araw, {firstName}!</strong>
           <p className="m-muted">
@@ -61,7 +55,7 @@ export default function HomePage() {
         {t.collectionToday ? (
           <>
             <p className="m-eyebrow res-gap">Today&apos;s pickup</p>
-            <h2 className="m-h2 res-waste">{plainWaste(t.todaysRun.wasteType)}</h2>
+            <h2 className="m-h2 res-waste">Garbage pickup today</h2>
             <dl className="m-kv res-gap">
               <dt>
                 <Clock size={13} /> Pickup time
@@ -78,19 +72,22 @@ export default function HomePage() {
               </dt>
               <dd>{route.shortName}</dd>
             </dl>
-            {tips[t.todaysRun.wasteType] && (
-              <div className="ct-alert res-gap">
-                <CircleCheck size={15} />
-                <span>{tips[t.todaysRun.wasteType]}</span>
-              </div>
-            )}
+            <div className="ct-alert res-gap">
+              <CircleCheck size={15} />
+              <span>Tie your garbage bags well and put them out before the pickup time.</span>
+            </div>
           </>
         ) : (
           <p className="res-gap">
-            No pickup today ({t.today}). <Link to="/resident/schedule">See the pickup days</Link>.
+            {t.todayException
+              ? `No pickup today: ${t.todayException.reason}. `
+              : `No pickup today (${t.today}). Pickup days are ${scheduleLabel}. `}
+            <Link to="/resident/schedule">See the pickup days</Link>.
           </p>
         )}
       </section>
+
+      {t.collectionToday && <CollectionFeedbackCard resident={resident} />}
 
       <section className="m-card m-card--flush" aria-label="Truck location">
         <div className="m-row m-row--between res-card-head">

@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useLayoutEffect, useRef } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import MobileFrame from './MobileFrame.jsx'
 import PageLoader from './PageLoader.jsx'
@@ -9,6 +9,19 @@ import './MobileAppLayout.css'
 // tabs: [{ to, label, icon, end?, alsoActiveOn?: [paths] }]
 export default function MobileAppLayout({ header, tabs }) {
   const { pathname } = useLocation()
+  const headerRef = useRef(null)
+
+  // Share the header height, so sticky bars inside pages sit just below it.
+  useLayoutEffect(() => {
+    const el = headerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const frame = el.parentElement
+    const update = () => frame.style.setProperty('--mobile-header-h', `${el.offsetHeight}px`)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   function isActive(tab) {
     if (tab.alsoActiveOn?.some((p) => pathname.startsWith(p))) return true
@@ -17,7 +30,9 @@ export default function MobileAppLayout({ header, tabs }) {
 
   return (
     <MobileFrame>
-      <header className="mobile-header">{header}</header>
+      <header className="mobile-header" ref={headerRef}>
+        {header}
+      </header>
       <main className="mobile-content">
         <Suspense fallback={<PageLoader />}>
           <Outlet />

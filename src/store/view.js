@@ -22,6 +22,7 @@ export function viewFor(state, user) {
     truck: state.truck,
     route: state.route,
     weeklySchedule: state.weeklySchedule,
+    scheduleExceptions: state.scheduleExceptions ?? [],
     simulation: state.simulation,
     activeRunId: state.activeRunId,
   }
@@ -37,6 +38,7 @@ export function viewFor(state, user) {
     barangayName: state.settings.barangayName,
     completionTarget: state.settings.completionTarget,
     simulationIntervalMs: state.settings.simulationIntervalMs,
+    officePhone: state.settings.officePhone ?? '',
   }
 
   if (user.role === 'driver') {
@@ -46,6 +48,13 @@ export function viewFor(state, user) {
       // Other drivers: name only. Own record: full.
       drivers: state.drivers.map((d) => (d.id === user.refId ? d : { id: d.id, name: d.name, initials: d.initials, status: d.status })),
       runs: state.runs,
+      collectionFeedback: [],
+      driverIssues: (state.driverIssues ?? []).filter((x) => x.driverId === user.refId),
+      // Only the crew working on this driver's truck (view only).
+      crew:
+        state.truck.driverId === user.refId
+          ? (state.crew ?? []).filter((c) => c.truckId === state.truck.id && c.status === 'active').map(({ id, name, role, photo }) => ({ id, name, role, photo: photo ?? null }))
+          : [],
       notifications: withReadState(state.notifications.filter((n) => n.audience === 'driver'), key),
       residents: [],
       reports: [],
@@ -72,6 +81,9 @@ export function viewFor(state, user) {
     activeRunId: state.activeRunId && run?.id === state.activeRunId ? state.activeRunId : null,
     residents: resident ? [resident] : [],
     reports: state.reports.filter((r) => r.residentId === user.refId),
+    collectionFeedback: (state.collectionFeedback ?? []).filter((f) => f.residentId === user.refId),
+    driverIssues: [],
+    crew: [],
     notifications: withReadState(notificationsForResident(state.notifications, resident), key),
     broadcasts: [],
   }

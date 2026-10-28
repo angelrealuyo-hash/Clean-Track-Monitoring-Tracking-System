@@ -134,6 +134,29 @@
   border-radius: var(--ct-radius);
 }
 
+.admin-profile {
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.admin-profile:hover,
+.admin-profile:focus-visible {
+  background: #d7f0e0;
+  border-color: var(--ct-green-700);
+}
+
+.admin-profile > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-profile__icon {
+  flex-shrink: 0;
+  color: var(--ct-green-700);
+}
+
 .admin-profile strong {
   display: block;
   font-size: 13px;
@@ -163,6 +186,18 @@
   width: 32px;
   height: 32px;
   font-size: 12px;
+}
+
+.admin-avatar--link {
+  display: inline-flex;
+  text-decoration: none;
+  border-radius: 50%;
+  transition: box-shadow 0.15s;
+}
+
+.admin-avatar--link:hover,
+.admin-avatar--link:focus-visible {
+  box-shadow: 0 0 0 3px var(--ct-green-100), 0 0 0 4px var(--ct-green-700);
 }
 
 /* ---------- Top bar + content ---------- */

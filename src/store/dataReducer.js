@@ -1,6 +1,9 @@
 // Every change to the demo data goes through here.
 import { todayISO } from '../utils/format.js'
 import { IDLE_CONTROL, isCollectionStop, simElapsed } from '../services/trackingSimulation.js'
+import { feedbackId } from '../data/collectionFeedback.js'
+import { exceptionKinds, isPickupDate } from '../data/schedule.js'
+import { formatDate } from '../utils/format.js'
 
 const now = () => new Date().toISOString()
 
@@ -59,6 +62,8 @@ function createRun(state, { by = 'admin', driverId } = {}) {
     id,
     date,
     status: 'in-progress', // 'in-progress' | 'completed' | 'ended-early'
+    // Not a regular collection day (Mon/Wed/Fri): an office-recorded special run.
+    special: !isPickupDate(date, state.scheduleExceptions),
     startedAt: now(),
     endedAt: null,
     startedBy: by,
@@ -86,6 +91,8 @@ function updateRun(state, runId, fn) {
 function recordStop(state, { stopId, status, note = '', by = 'admin', byName = '', bags = null }) {
   let next = state
   let run = currentRun(next)
+  // Already recorded as collected: a second tap must not create a new record.
+  if (status === 'collected' && run?.results[stopId]?.status === 'collected') return state
   if (!run) {
     run = createRun(next, { by })
     next = { ...next, runs: [run, ...next.runs], activeRunId: run.id }
@@ -103,6 +110,34 @@ function recordStop(state, { stopId, status, note = '', by = 'admin', byName = '
       : [...r.stops, ...next.route.stops.filter((s) => s.id === stopId).map((s) => ({ id: s.id, name: s.name, purok: s.purok, households: s.households }))],
     results: { ...r.results, [stopId]: result },
   }))
+}
+
+// Adds a resident report and alerts the office. Returns the new state and report.
+function addReport(state, p) {
+  const year = new Date().getFullYear()
+  const { history: firstEntry = 'Report submitted by resident', ...fields } = p
+  const report = {
+    ...fields,
+    id: p.id ?? nextId(`REP-${year}`, state.reports, 3),
+    status: 'submitted',
+    submittedAt: now(),
+    adminResponse: null,
+    history: [{ at: now(), text: firstEntry }],
+  }
+  return {
+    report,
+    state: {
+      ...state,
+      reports: [report, ...state.reports],
+      notifications: addNotification(state, {
+        audience: 'admin',
+        priority: p.category === 'missed' || p.category === 'no-truck' ? 'high' : 'medium',
+        title: `New resident report ${report.id}`,
+        body: `${p.categoryLabel} at ${p.location}.`,
+        link: { label: `Open report ${report.id}`, to: `/admin/resident-reports?id=${report.id}` },
+      }),
+    },
+  }
 }
 
 export function dataReducer(state, action) {
@@ -331,45 +366,81 @@ export function dataReducer(state, action) {
         ),
       }
 
-    case 'report/add': {
-      const year = new Date().getFullYear()
-      const report = {
-        ...p,
-        id: p.id ?? nextId(`REP-${year}`, state.reports, 3),
-        status: 'submitted',
-        submittedAt: now(),
-        adminResponse: null,
-        history: [{ at: now(), text: 'Report submitted by resident' }],
+    case 'report/add':
+      return addReport(state, p).state
+
+    // Resident pickup feedback. One record per resident per date: answering
+    // again replaces the earlier answer (latest answer kept).
+    case 'feedback/submit': {
+      const list = state.collectionFeedback ?? []
+      const id = feedbackId(p.residentId, p.date)
+      const existing = list.find((f) => f.id === id)
+      let next = state
+      let reportId = existing?.reportId ?? null
+      // A reason that needs follow-up becomes a resident report (once).
+      if (p.report && !reportId) {
+        const added = addReport(next, { ...p.report, history: 'Sent from pickup feedback' })
+        next = added.state
+        reportId = added.report.id
+      }
+      const record = {
+        id,
+        residentId: p.residentId,
+        residentName: p.residentName ?? '',
+        purok: p.purok ?? '',
+        date: p.date,
+        runId: p.runId ?? null,
+        willDispose: Boolean(p.willDispose),
+        truckPassed: p.truckPassed ?? null,
+        disposed: p.disposed ?? null,
+        reason: p.reason ?? null,
+        reasonText: p.reasonText ?? '',
+        reportId,
+        submittedAt: existing?.submittedAt ?? now(),
+        updatedAt: now(),
       }
       return {
-        ...state,
-        reports: [report, ...state.reports],
-        notifications: addNotification(state, {
-          audience: 'admin',
-          priority: p.category === 'missed' || p.category === 'no-truck' ? 'high' : 'medium',
-          title: `New resident report ${report.id}`,
-          body: `${p.categoryLabel} at ${p.location}.`,
-          link: { label: `Open report ${report.id}`, to: `/admin/resident-reports?id=${report.id}` },
-        }),
+        ...next,
+        collectionFeedback: [record, ...list.filter((f) => f.id !== id)],
+        // Answered: the day's "Pick Up Check" message no longer shows as new.
+        notifications: next.notifications.map((n) => (n.key === `pickup-check-${p.date}` ? markReadBy(n, p.residentId) : n)),
       }
     }
 
     case 'driver/reportIssue': {
-      let next = state
+      // Every problem is saved, so the office can see it in Collection Monitoring.
+      const issues = state.driverIssues ?? []
+      const issue = {
+        id: nextId('ISS', issues, 3),
+        reportedAt: now(),
+        driverId: p.driverId ?? null,
+        driverName: p.driverName ?? 'Driver',
+        runId: currentRun(state)?.id ?? null,
+        stopId: p.stopId ?? null,
+        stopName: p.stopName ?? null,
+        issueType: p.issueType ?? 'other',
+        issueLabel: p.issueLabel,
+        description: p.description,
+        photo: p.photo ?? null,
+        notifiedOffice: Boolean(p.notifyDispatch),
+        markedMissed: Boolean(p.markMissed && p.stopId),
+      }
+      let next = { ...state, driverIssues: [issue, ...issues] }
+      const where = p.stopName ? ` at ${p.stopName}` : ''
       if (p.notifyDispatch) {
         next = {
           ...next,
           notifications: addNotification(next, {
             audience: 'admin',
             priority: 'high',
-            title: `Driver issue at ${p.stopName}: ${p.issueLabel}`,
+            title: `Driver issue${where}: ${p.issueLabel}`,
             body: `${p.driverName}: ${p.description}`,
             photo: p.photo ?? null,
             link: { label: 'Open Collection Monitoring', to: '/admin/collection' },
           }),
         }
       }
-      if (p.markMissed) {
+      if (p.markMissed && p.stopId) {
         next = recordStop(next, {
           stopId: p.stopId,
           status: 'missed',
@@ -406,6 +477,44 @@ export function dataReducer(state, action) {
         }),
       }
     }
+
+    // ---------- Truck crew ----------
+    case 'crew/add': {
+      const crew = state.crew ?? []
+      return { ...state, crew: [...crew, { ...p, id: nextId('CRW', crew), createdAt: now() }] }
+    }
+
+    case 'crew/update':
+      return { ...state, crew: (state.crew ?? []).map((c) => (c.id === p.id ? { ...c, ...p.patch } : c)) }
+
+    case 'crew/delete':
+      return { ...state, crew: (state.crew ?? []).filter((c) => c.id !== p.id) }
+
+    // Holiday / suspension: that date has no regular pickup. Residents are told.
+    case 'schedule/addException': {
+      const list = (state.scheduleExceptions ?? []).filter((x) => x.date !== p.date)
+      const item = { date: p.date, kind: p.kind, reason: p.reason, createdAt: now() }
+      return {
+        ...state,
+        scheduleExceptions: [...list, item].sort((a, b) => a.date.localeCompare(b.date)),
+        notifications: addNotification(state, {
+          audience: 'resident',
+          zone: 'All Puroks',
+          kind: 'advisory',
+          priority: 'high',
+          key: `exception-${p.date}`,
+          title: `No garbage pickup on ${formatDate(p.date)}`,
+          body: `${exceptionKinds[p.kind]}: ${p.reason}`,
+          link: { label: 'See pickup days', to: '/resident/schedule' },
+        }).filter((n, i, all) => !n.key || all.findIndex((m) => m.key === n.key) === i),
+      }
+    }
+
+    case 'schedule/removeException':
+      return { ...state, scheduleExceptions: (state.scheduleExceptions ?? []).filter((x) => x.date !== p.date) }
+
+    case 'admin/setPhoto':
+      return { ...state, adminPhoto: p.photo ?? null }
 
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...p }, savedAt: now() }

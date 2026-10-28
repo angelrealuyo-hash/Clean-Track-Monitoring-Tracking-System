@@ -118,3 +118,257 @@
   height: 52px;
   font-size: 16px;
 }
+
+/* ---------- Today's pickup check (feedback) ---------- */
+.res-feedback {
+  border-top: 4px solid var(--ct-green-700);
+}
+
+.res-feedback .m-h2 {
+  margin: 6px 0 12px;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.res-yesno {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.res-yesno .ct-btn {
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.res-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.res-reason {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.res-reason.is-on {
+  background: var(--ct-green-100);
+  border-color: var(--ct-green-700);
+}
+
+.res-reason input {
+  accent-color: var(--ct-green-700);
+}
+
+.res-fb-summary {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+button.res-inline-link {
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Friendly reply after answering the Pick Up Check */
+.res-reply {
+  margin: 8px 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  border-radius: 10px;
+}
+
+.res-reply.is-win {
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+}
+
+.res-reply.is-fun {
+  color: #8a5300;
+  background: var(--ct-amber-100);
+}
+
+.res-reply.is-care {
+  color: var(--ct-blue-600);
+  background: var(--ct-blue-100);
+}
+
+.res-check-answer {
+  margin-top: 10px;
+}
+
+/* ---------- Pickup calendar ---------- */
+.res-cal {
+  position: relative;
+}
+
+.res-cal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.res-cal__head strong {
+  font-family: var(--ct-font-heading);
+  font-size: 16px;
+  color: var(--ct-green-900);
+}
+
+.res-cal__today {
+  display: block;
+  margin: 2px auto 8px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ct-green-700);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.res-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.res-cal__wd {
+  padding-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ct-text-muted);
+}
+
+.res-cal__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  min-height: 46px;
+  padding: 4px 0;
+  font: inherit;
+  color: var(--ct-text);
+  background: var(--ct-surface);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.res-cal__num {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.res-cal__day.is-none {
+  color: var(--ct-text-muted);
+}
+
+.res-cal__day.is-scheduled,
+.res-cal__day.is-done {
+  color: var(--ct-green-900);
+  background: var(--ct-green-50);
+}
+
+.res-cal__day.is-done {
+  background: var(--ct-green-100);
+}
+
+.res-cal__day.is-skipped {
+  color: #4b5a52;
+  background: #eef1ef;
+}
+
+.res-cal__day.is-missed {
+  color: var(--ct-red-600);
+  background: var(--ct-red-100);
+}
+
+.res-cal__day.is-holiday {
+  color: #8a5300;
+  background: var(--ct-amber-100);
+}
+
+.res-cal__day.is-today {
+  border-color: var(--ct-green-700);
+}
+
+.res-cal__day.is-selected {
+  box-shadow: 0 0 0 2px var(--ct-green-900);
+}
+
+.res-cal__day:focus-visible {
+  outline: 2px solid var(--ct-green-700);
+  outline-offset: 1px;
+}
+
+.res-cal__legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 12px;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  font-size: 12px;
+  list-style: none;
+  border-top: 1px solid var(--ct-border);
+}
+
+.res-cal__legend li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.res-cal__legend .is-scheduled,
+.res-cal__legend .is-done {
+  color: var(--ct-green-900);
+}
+
+.res-cal__legend .is-skipped {
+  color: #4b5a52;
+}
+
+.res-cal__legend .is-missed {
+  color: var(--ct-red-600);
+}
+
+.res-cal__legend .is-holiday {
+  color: #8a5300;
+}
+
+.res-feedback.is-closed {
+  border-top-width: 3px;
+}
+
+.res-feedback.is-closed .res-reply {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.res-fb-actions {
+  display: flex;
+  gap: 16px;
+}

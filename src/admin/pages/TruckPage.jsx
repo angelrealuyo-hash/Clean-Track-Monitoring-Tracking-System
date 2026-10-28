@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import {
   CalendarClock,
   CircleCheck,
-  Eye,
   Gauge,
   Info,
   MapPin,
@@ -115,9 +114,6 @@ export default function TruckPage() {
                     </td>
                     <td>
                       <div className="ct-table__actions">
-                        <a href="#truck-details" className="ct-icon-btn" aria-label="View details">
-                          <Eye size={16} />
-                        </a>
                         <button type="button" className="ct-icon-btn" aria-label="Edit vehicle" onClick={() => setModal('edit')}>
                           <Pencil size={16} />
                         </button>

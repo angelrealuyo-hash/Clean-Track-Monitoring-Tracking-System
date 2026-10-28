@@ -58,7 +58,23 @@
 
 .mobile-content {
   flex: 1;
-  overflow-y: auto;
+}
+
+/* On phones the whole page scrolls (header stays on top). In the desktop
+   "phone frame" only this area scrolls. Sticky bars inside a page use
+   --mobile-sticky-top so they sit just under the header in both cases. */
+.mobile-frame {
+  --mobile-sticky-top: var(--mobile-header-h, 56px);
+}
+
+@media (min-width: 520px) {
+  .mobile-content {
+    overflow-y: auto;
+  }
+
+  .mobile-frame {
+    --mobile-sticky-top: 0px;
+  }
 }
 
 .mobile-content .placeholder-page {

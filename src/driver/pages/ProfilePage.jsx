@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Headset, IdCard, Phone, Play, Route as RouteIcon, Siren, Square, Truck, KeyRound } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Headset, IdCard, Phone, Route as RouteIcon, Siren, Truck, KeyRound } from 'lucide-react'
 import StatusBadge from '../../components/StatusBadge.jsx'
+import Avatar from '../../components/Avatar.jsx'
+import MyCrewCard from '../components/MyCrewCard.jsx'
 import SignOutButton from '../../components/SignOutButton.jsx'
 import ChangePasswordModal from '../../components/ChangePasswordModal.jsx'
 import { useDriverRoute } from '../components/useDriverRoute.js'
-import { useRouteActions } from '../components/useRouteActions.js'
-import { useToast } from '../../components/toast/toastContext.js'
 import { driverStatusMeta, truckStatusMeta } from '../../store/selectors.js'
 import { barangay } from '../../data/barangay.js'
 import './DriverPages.css'
@@ -16,20 +17,9 @@ const tel = (n) => `tel:${n.replace(/[^\d+]/g, '')}`
 export default function ProfilePage() {
   const [pwOpen, setPwOpen] = useState(false)
   const r = useDriverRoute()
-  const toast = useToast()
-  const { driver, truck, route, summary, assigned, dispatch } = r
+  const { driver, truck, route, summary, assigned } = r
   const status = driverStatusMeta[driver.status]
-  const onShift = driver.status === 'on-shift'
-  const { runActive, endRoute } = useRouteActions(r)
-
-  function setShift(next) {
-    dispatch({ type: 'driver/update', payload: { id: driver.id, patch: { status: next } } }).then((res) => {
-      if (!res.ok) return
-      // Ending the shift also ends an open route, so the run is saved.
-      if (next === 'off-duty' && runActive) endRoute()
-      toast(next === 'on-shift' ? 'Shift started' : 'Shift ended')
-    })
-  }
+  const officePhone = r.data.settings.officePhone ?? ''
 
   return (
     <div className="m-page">
@@ -39,9 +29,7 @@ export default function ProfilePage() {
       </div>
 
       <section className="m-card m-card--accent m-row">
-        <span className="ct-avatar" style={{ width: 52, height: 52, fontSize: 16 }}>
-          {driver.initials}
-        </span>
+        <Avatar photo={driver.photo} initials={driver.initials} name={driver.name} style={{ width: 52, height: 52, fontSize: 16 }} />
         <div className="m-grow">
           <strong>{driver.name}</strong>
           <p className="m-muted">
@@ -104,35 +92,36 @@ export default function ProfilePage() {
               <span style={{ width: `${summary.percent}%` }} />
             </div>
           </div>
-          <div className="m-box">
-            <small>Households served</small>
-            <strong className="m-big">
-              {r.collectedHouseholds}
-              <small> / {r.totalHouseholds}</small>
-            </strong>
-          </div>
         </div>
-        {onShift ? (
-          <button type="button" className="ct-btn ct-btn--secondary ct-btn--block drv-gap" onClick={() => setShift('off-duty')}>
-            <Square size={14} /> End My Shift
-          </button>
-        ) : (
-          <button type="button" className="ct-btn ct-btn--primary ct-btn--block drv-gap" onClick={() => setShift('on-shift')}>
-            <Play size={15} /> Start My Shift
-          </button>
-        )}
+        {/* Shifts start with Start Route (Home) and end with END MY SHIFT (My Route). */}
+        <p className="m-muted drv-gap">
+          Start your shift with <Link to="/driver">Start Route</Link>. When every stop is collected, end it in{' '}
+          <Link to="/driver/route">My Route</Link>.
+        </p>
       </section>
+
+      <MyCrewCard crew={r.crew} assigned={assigned} />
 
       <section className="m-card">
         <strong>Need Help?</strong>
-        <a className="m-box m-row drv-gap" href={tel(barangay.hotline)}>
-          <Headset size={16} />
-          <span className="m-grow">
-            <small>Barangay office</small>
-            <strong>{barangay.hotline}</strong>
-          </span>
-          <Phone size={14} />
-        </a>
+        {officePhone ? (
+          <a className="m-box m-row drv-gap" href={tel(officePhone)}>
+            <Headset size={16} />
+            <span className="m-grow">
+              <small>Barangay office</small>
+              <strong>{officePhone}</strong>
+            </span>
+            <Phone size={14} />
+          </a>
+        ) : (
+          <div className="m-box m-row drv-gap">
+            <Headset size={16} />
+            <span className="m-grow">
+              <small>Barangay office</small>
+              <strong>No office number yet (the admin can add it in Settings)</strong>
+            </span>
+          </div>
+        )}
         <a className="m-box m-row drv-gap" href="tel:911">
           <Siren size={16} color="var(--ct-red-600)" />
           <span className="m-grow">

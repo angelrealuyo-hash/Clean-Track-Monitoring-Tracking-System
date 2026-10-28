@@ -1,9 +1,12 @@
 // Run with: npm test   (uses a temporary in-memory database)
-import { test, before, after } from 'node:test'
+import { test, before, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { openDatabase } from '../server/db.js'
 import { createApi } from '../server/app.js'
+
+// Pin the clock to a Wednesday (an official collection day).
+mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-28T09:00:00') })
 
 let server, base, api
 before(async () => {
@@ -75,7 +78,7 @@ test('full workflow persists in the database and is shared across roles', async 
 
   // Admin changes today's schedule -> resident sees it.
   const day = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-  assert.equal((await act(adm, 'schedule/update', { day, patch: { wasteType: 'Recyclables (Plastics, Cartons, Metals)', window: '07:00 AM - 11:00 AM' } })).status, 200)
+  assert.equal((await act(adm, 'schedule/update', { day, patch: { window: '07:00 AM - 11:00 AM' } })).status, 200)
   const resState = (await call('/state', { token: res })).json.data
   assert.equal(resState.weeklySchedule.find((d) => d.day === day).window, '07:00 AM - 11:00 AM')
 
@@ -107,7 +110,7 @@ test('full workflow persists in the database and is shared across roles', async 
 
   // Stored in the database tables (not just memory).
   const row = api.db.prepare("SELECT recorded_by, recorded_by_name, bags FROM collection_records WHERE stop_id = 'STP-02'").get()
-  assert.deepEqual({ ...row }, { recorded_by: 'driver', recorded_by_name: 'Carlos Ortiz', bags: 9 })
+  assert.deepEqual({ ...row }, { recorded_by: 'driver', recorded_by_name: 'Carlos Ortiz', bags: null }, 'drivers no longer record bag counts')
   assert.equal(api.db.prepare('SELECT status FROM reports WHERE id = ?').get(mine.id).status, 'resolved')
   assert.ok(api.db.prepare("SELECT count(*) n FROM location_history WHERE source = 'SIMULATED'").get().n > 0, 'simulated location logged')
 })

@@ -1,6 +1,6 @@
-// Shrinks a photo before upload so reports stay small (the server accepts up to ~500 KB).
+// Shrinks a photo before upload (the server accepts up to ~500 KB per image).
 // Returns a JPEG data URL no wider/taller than maxSize pixels.
-export function resizeImage(file, maxSize = 640, quality = 0.7) {
+export function resizeImage(file, maxSize = 1024, quality = 0.75) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('Please choose an image file (JPG or PNG).'))
@@ -23,7 +23,14 @@ export function resizeImage(file, maxSize = 640, quality = 0.7) {
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       URL.revokeObjectURL(url)
-      resolve(canvas.toDataURL('image/jpeg', quality))
+      // Stay under the server limit (~500 KB): lower the quality if needed.
+      let q = quality
+      let out = canvas.toDataURL('image/jpeg', q)
+      while (out.length > 600_000 && q > 0.35) {
+        q -= 0.1
+        out = canvas.toDataURL('image/jpeg', q)
+      }
+      resolve(out)
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)

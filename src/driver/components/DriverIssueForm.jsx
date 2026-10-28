@@ -12,32 +12,34 @@ const issueTypes = [
   { id: 'other', label: 'Something else', hint: 'Any other problem', icon: CircleHelp },
 ]
 
-// Driver "Report a Problem" at a stop (PDF page 47, right).
-export default function DriverIssueForm({ stop, number, driverName, onSubmit, onCancel }) {
-  const [form, setForm] = useState({ type: 'blocked', description: '', photo: null, notifyDispatch: true, markMissed: true })
+// Driver "Report a Problem" (from Home or from a stop in My Route).
+// stops: [{ stop, number, status }] to choose from; stopId: preselected stop or ''.
+// Every report is saved for the office (Collection Monitoring).
+export default function DriverIssueForm({ stops, stopId = '', driverName, saving = false, onSubmit, onCancel }) {
+  const [form, setForm] = useState({ stopId, type: 'blocked', description: '', photo: null, notifyDispatch: true, markMissed: false })
   const [error, setError] = useState('')
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+  const chosen = stops.find((s) => s.stop.id === form.stopId) ?? null
+  // "Could not pick up here" only makes sense for a stop that is not done yet.
+  const canMarkMissed = Boolean(chosen && (chosen.status === 'pending' || chosen.status === 'next'))
 
   function submit(e) {
     e.preventDefault()
+    if (saving) return
     if (form.description.trim().length < 10) {
       setError('Please write a few words about what happened.')
       return
     }
-    if (!form.notifyDispatch && !form.markMissed) {
-      setError('Tick at least one box above.')
-      return
-    }
     const type = issueTypes.find((t) => t.id === form.type)
     onSubmit({
-      stopId: stop.id,
-      stopName: stop.name,
+      stopId: chosen?.stop.id ?? null,
+      stopName: chosen?.stop.name ?? null,
       issueType: type.id,
       issueLabel: type.label,
       description: form.description.trim(),
       photo: form.photo,
       notifyDispatch: form.notifyDispatch,
-      markMissed: form.markMissed,
+      markMissed: canMarkMissed && form.markMissed,
       driverName,
     })
   }
@@ -45,16 +47,26 @@ export default function DriverIssueForm({ stop, number, driverName, onSubmit, on
   return (
     <form className="m-page" onSubmit={submit} noValidate>
       <header className="m-subhead">
-        <button type="button" className="ct-icon-btn" onClick={onCancel} aria-label="Back to stop">
+        <button type="button" className="ct-icon-btn" onClick={onCancel} aria-label="Go back">
           <ArrowLeft size={18} />
         </button>
         <div className="m-grow">
-          <h1>What is the problem?</h1>
-          <p>
-            Stop #{number} · {stop.name}
-          </p>
+          <h1>Report a Problem</h1>
+          <p>The office will see this report.</p>
         </div>
       </header>
+
+      <label className="ct-field">
+        <span className="ct-label">Where?</span>
+        <select className="ct-input" value={form.stopId} onChange={set('stopId')}>
+          <option value="">Not at a stop (on the road, truck, depot)</option>
+          {stops.map((s) => (
+            <option key={s.stop.id} value={s.stop.id}>
+              Stop #{s.number} · {s.stop.name}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div className="m-row m-row--between">
         <h2 className="m-section-title">Choose one</h2>
@@ -101,16 +113,18 @@ export default function DriverIssueForm({ stop, number, driverName, onSubmit, on
             <strong>Tell the office now</strong> (they will get an urgent message)
           </span>
         </label>
-        <label className="ct-checkbox drv-gap">
-          <input type="checkbox" checked={form.markMissed} onChange={set('markMissed')} />
-          <span>
-            <strong>I could not pick up here</strong> (the truck will come back later)
-          </span>
-        </label>
+        {canMarkMissed && (
+          <label className="ct-checkbox drv-gap">
+            <input type="checkbox" checked={form.markMissed} onChange={set('markMissed')} />
+            <span>
+              <strong>I could not pick up at this stop</strong> (saved as “Could not pick up”)
+            </span>
+          </label>
+        )}
       </section>
 
-      <button type="submit" className="ct-btn ct-btn--primary ct-btn--block">
-        <Send size={16} /> Send to the Office
+      <button type="submit" className="ct-btn ct-btn--primary ct-btn--block" disabled={saving}>
+        <Send size={16} /> {saving ? 'Sending…' : 'Send to the Office'}
       </button>
       <button type="button" className="ct-btn ct-btn--secondary ct-btn--block" onClick={onCancel}>
         Cancel

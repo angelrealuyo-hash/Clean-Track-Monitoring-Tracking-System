@@ -4,6 +4,7 @@ import StatCard from '../components/StatCard.jsx'
 import BarList from '../components/charts/BarList.jsx'
 import StatusBar from '../components/charts/StatusBar.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
+import FeedbackAnalytics from '../components/FeedbackAnalytics.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useTracking } from '../../tracking/trackingContext.js'
 import { useToast } from '../../components/toast/toastContext.js'
@@ -101,7 +102,8 @@ export default function ReportsAnalyticsPage() {
         <Info size={16} />
         <span>
           Built from <strong>{runs.length}</strong> saved collection run{runs.length === 1 ? '' : 's'} and{' '}
-          <strong>{reports.length}</strong> resident reports saved in the CleanTrack database. A run is saved each time the driver taps Start
+          <strong>{reports.length}</strong> resident reports saved in the CleanTrack database, plus{' '}
+          <strong>{(data.collectionFeedback ?? []).length}</strong> resident pickup answers (see Resident Collection Participation below). A run is saved each time the driver taps Start
           Route. Truck positions are simulated; stop results are what the driver or office recorded.
         </span>
       </div>
@@ -212,6 +214,7 @@ export default function ReportsAnalyticsPage() {
                       <td>
                         <strong>{formatDate(h.run.date)}</strong>
                         <small className="ct-mono">{h.run.id}</small>
+                        {h.run.special && <small>Special (not Mon/Wed/Fri)</small>}
                       </td>
                       <td>{h.run.driverName}</td>
                       <td>
@@ -278,6 +281,8 @@ export default function ReportsAnalyticsPage() {
           <span>Reports are matched to a purok by the location the resident entered.</span>
         </div>
       </article>
+
+      <FeedbackAnalytics feedback={data.collectionFeedback ?? []} runs={runs} residentCount={data.residents.length} />
     </div>
   )
 }

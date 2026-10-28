@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CircleCheck, ClipboardList, Eye, FileText, History, Inbox, MapPin, Phone, Search, TriangleAlert, User, Wrench } from 'lucide-react'
+import { Camera, CircleCheck, ClipboardList, FileText, History, Image as ImageIcon, Inbox, MapPin, Phone, Search, TriangleAlert, User, Wrench } from 'lucide-react'
+import AuthImage from '../../components/AuthImage.jsx'
+import Modal from '../../components/Modal.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
 import DetailPanel, { DetailSection } from '../components/DetailPanel.jsx'
@@ -28,6 +30,7 @@ export default function ResidentReportsPage() {
   const [category, setCategory] = useState('all')
   const selectedId = params.get('id') ?? reports.find((r) => r.status !== 'resolved')?.id ?? reports[0]?.id
   const select = (id) => setParams(id ? { id } : {}, { replace: true })
+  const [viewPhoto, setViewPhoto] = useState(null) // report whose photo is open in the large view
 
   const q = query.trim().toLowerCase()
   const visible = reports.filter(
@@ -96,12 +99,19 @@ export default function ResidentReportsPage() {
                     <th>Category</th>
                     <th>Location</th>
                     <th>Status</th>
-                    <th className="is-right">View</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visible.map((r) => (
-                    <tr key={r.id} className={`is-clickable ${r.id === selectedId ? 'is-selected' : ''}`} onClick={() => select(r.id)}>
+                    <tr key={r.id} className={`is-clickable ${r.id === selectedId ? 'is-selected' : ''}`} onClick={() => select(r.id)}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          select(r.id)
+                        }
+                      }}
+                    >
                       <td>
                         <strong className="ct-mono">#{r.id}</strong>
                         <small>{formatDateTime(r.submittedAt)}</small>
@@ -113,21 +123,6 @@ export default function ResidentReportsPage() {
                       </td>
                       <td>
                         <StatusBadge tone={reportStatusMeta[r.status].tone}>{reportStatusMeta[r.status].label}</StatusBadge>
-                      </td>
-                      <td>
-                        <div className="ct-table__actions">
-                          <button
-                            type="button"
-                            className="ct-icon-btn"
-                            aria-label={`View ${r.id}`}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              select(r.id)
-                            }}
-                          >
-                            <Eye size={16} />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}
@@ -152,7 +147,7 @@ export default function ResidentReportsPage() {
           >
             <DetailSection icon={FileText} title="Ticket Information">
               <div>
-                <small>Waste Category</small>
+                <small>Problem Type</small>
                 <p>
                   <strong>{categoryLabel[selected.category]}</strong>
                 </p>
@@ -178,6 +173,25 @@ export default function ResidentReportsPage() {
 
             <DetailSection icon={FileText} title="Resident Notes">
               <p className="report-quote">“{selected.description}”</p>
+            </DetailSection>
+
+            <DetailSection icon={Camera} title="Attached Photo">
+              {selected.photo ? (
+                <>
+                  <AuthImage
+                    key={selected.photo}
+                    src={selected.photo}
+                    alt={`Photo attached to report ${selected.id}`}
+                    className="report-photo"
+                    onClick={() => setViewPhoto(selected)}
+                  />
+                  <small className="report-photo__hint">Click the photo to see it larger.</small>
+                </>
+              ) : (
+                <p className="report-photo__none">
+                  <ImageIcon size={14} /> No photo was attached to this report.
+                </p>
+              )}
             </DetailSection>
 
             <DetailSection icon={History} title="Activity">
@@ -211,6 +225,12 @@ export default function ResidentReportsPage() {
           <div className="ct-card ct-empty">Select a report to see details.</div>
         )}
       </div>
+
+      {viewPhoto && (
+        <Modal title={`Report #${viewPhoto.id} · Photo`} subtitle={`${viewPhoto.residentName} · ${viewPhoto.location}`} icon={Camera} size="lg" onClose={() => setViewPhoto(null)}>
+          <AuthImage src={viewPhoto.photo} alt={`Photo attached to report ${viewPhoto.id}`} className="ct-photo-full" />
+        </Modal>
+      )}
     </div>
   )
 }

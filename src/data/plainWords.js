@@ -1,20 +1,11 @@
 // Everyday wording for the Resident and Driver apps, so ordinary people can
 // understand them. The Admin website keeps the official terms.
 
-const waste = {
-  // Residents put out tied garbage BAGS; no bins are required.
-  'Biodegradable (Kitchen & Yard Waste)': { name: 'Food & garden waste', bin: '' },
-  'Recyclables (Plastics, Cartons, Metals)': { name: 'Recyclables', bin: '' },
-  'Residual Non-Recyclable Waste': { name: 'Other trash', bin: '' },
-  'Hazardous & Electronic Waste (Drop-off)': { name: 'Batteries & electronics', bin: 'drop-off only' },
-  'No collection': { name: 'No pickup', bin: '' },
-}
-
-// e.g. "Food & garden waste" or "Batteries & electronics (drop-off only)"
+// Residents put out tied garbage BAGS; they are not asked to sort by waste type.
+// Older saved schedules may still name a waste type: any of those reads as a pickup.
 export function plainWaste(wasteType) {
-  const w = waste[wasteType]
-  if (!w) return wasteType ?? '—'
-  return w.bin ? `${w.name} (${w.bin})` : w.name
+  if (!wasteType) return '—'
+  return wasteType === 'No collection' ? 'No pickup' : 'Garbage pickup'
 }
 
 // Report problem types, in the resident's words.

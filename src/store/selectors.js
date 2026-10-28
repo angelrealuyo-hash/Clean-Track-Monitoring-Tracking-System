@@ -99,3 +99,62 @@ export function truckDistanceToPurok(route, sim, purok) {
   const stopsAway = index - sim.legIndex - 1 // stops still to visit before this one
   return { state: stopsAway === 0 ? 'here' : 'approaching', stopsAway, stop }
 }
+
+// ---------- Resident pickup feedback (what residents SAID) ----------
+// feedback: collectionFeedback records (one per resident per date, so nobody
+// is counted twice for the same day). from/to: 'YYYY-MM-DD' (inclusive, optional).
+export function summarizeFeedback(feedback, { from = '', to = '' } = {}) {
+  const inRange = (date) => (!from || date >= from) && (!to || date <= to)
+  const rows = (feedback ?? []).filter((f) => inRange(f.date))
+  const pct = (part, whole) => (whole ? Math.round((part / whole) * 100) : null)
+  const count = (fn) => rows.filter(fn).length
+
+  const willYes = count((f) => f.willDispose)
+  const willNo = rows.length - willYes
+  const passedYes = count((f) => f.willDispose && f.truckPassed === true)
+  const passedNo = count((f) => f.willDispose && f.truckPassed === false)
+  const passedUnanswered = willYes - passedYes - passedNo
+  const disposedYes = count((f) => f.disposed === true)
+  const disposedNo = count((f) => f.disposed === false)
+  const disposedUnanswered = willYes - disposedYes - disposedNo
+
+  const reasons = {}
+  for (const f of rows) if (f.reason) reasons[f.reason] = (reasons[f.reason] ?? 0) + 1
+
+  return {
+    rows,
+    responses: rows.length,
+    residents: new Set(rows.map((f) => f.residentId)).size,
+    days: new Set(rows.map((f) => f.date)).size,
+    willYes,
+    willNo,
+    passedYes,
+    passedNo,
+    passedUnanswered,
+    disposedYes,
+    disposedNo,
+    disposedUnanswered,
+    reasons,
+    percent: {
+      willYes: pct(willYes, rows.length),
+      passedYes: pct(passedYes, passedYes + passedNo),
+      disposedYes: pct(disposedYes, disposedYes + disposedNo),
+    },
+  }
+}
+
+// Driver-confirmed pickups (saved stop records) for the same dates.
+export function summarizeRunsInRange(runs, { from = '', to = '' } = {}) {
+  const list = (runs ?? []).filter((r) => (!from || r.date >= from) && (!to || r.date <= to))
+  const totals = { runs: list.length, stops: 0, collected: 0, missed: 0, households: 0, completedRuns: 0 }
+  for (const run of list) {
+    const s = summarizeRun(run)
+    totals.stops += s.total
+    totals.collected += s.collected
+    totals.missed += s.missed
+    totals.households += s.households
+    if (run.status === 'completed') totals.completedRuns += 1
+  }
+  totals.percent = totals.stops ? Math.round((totals.collected / totals.stops) * 100) : null
+  return totals
+}

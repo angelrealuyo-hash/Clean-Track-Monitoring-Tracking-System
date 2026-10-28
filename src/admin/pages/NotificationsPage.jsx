@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AuthImage from '../../components/AuthImage.jsx'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Bell,
@@ -205,7 +206,7 @@ export default function NotificationsPage() {
                   <strong>{selected.title}</strong>
                 </p>
                 <p>{selected.body}</p>
-                {selected.photo && <img className="notif-photo" src={selected.photo} alt="Photo sent with this alert" />}
+                {selected.photo && <AuthImage className="notif-photo" src={selected.photo} alt="Photo sent with this alert" />}
               </DetailSection>
               <DetailSection title="Status">
                 <p>{selected.read ? 'Read' : 'Unread'}</p>

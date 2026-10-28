@@ -65,3 +65,16 @@
   font-size: 13px;
   color: var(--ct-text-muted);
 }
+
+/* Collector's Management: picture next to the name in the detail panel */
+.collector-title {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.collector-title__avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+}

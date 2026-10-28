@@ -1,16 +1,18 @@
 import { useState } from 'react'
+import AuthImage from '../../components/AuthImage.jsx'
 import {
   CircleCheck,
   ClipboardCheck,
   Download,
-  Eye,
   History,
   MapPin,
   Package,
   RotateCcw,
   Search,
+  Square,
   TriangleAlert,
   Truck,
+  Wrench,
 } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
@@ -25,7 +27,8 @@ import { useToast } from '../../components/toast/toastContext.js'
 import { currentRun, getCollectionSummary, getStopStatus, stopStatusMeta } from '../../store/selectors.js'
 import { isCollectionStop, SIMULATION_LABEL } from '../../services/trackingSimulation.js'
 import { downloadCsv } from '../../utils/csv.js'
-import { formatTime, todayISO } from '../../utils/format.js'
+import { formatDateTime, formatTime, localDateISO, todayISO } from '../../utils/format.js'
+import { exceptionOn, isPickupDate, scheduleLabel } from '../../data/schedule.js'
 import '../components/AdminPage.css'
 import './CollectionMonitoringPage.css'
 
@@ -56,7 +59,8 @@ export default function CollectionMonitoringPage() {
   const [purok, setPurok] = useState('all')
   const [status, setStatus] = useState('all')
   const [selectedId, setSelectedId] = useState(stops[0]?.stop.id ?? null)
-  const [modal, setModal] = useState(null) // 'missed' | 'clearAll'
+  const [modal, setModal] = useState(null) // 'missed' | 'clearAll' | 'endRun'
+  const runOpen = Boolean(run && run.id === data.activeRunId)
 
   const q = query.trim().toLowerCase()
   const visible = stops.filter(
@@ -109,6 +113,11 @@ export default function CollectionMonitoringPage() {
             >
               <RotateCcw size={16} /> Clear Results
             </button>
+            {runOpen && (
+              <button type="button" className="ct-btn ct-btn--danger" onClick={() => setModal('endRun')}>
+                <Square size={16} /> End Route
+              </button>
+            )}
           </>
         }
       />
@@ -117,11 +126,19 @@ export default function CollectionMonitoringPage() {
         <ClipboardCheck size={16} />
         {run ? (
           <span>
-            Collection run <strong>{run.id}</strong> · started {formatTime(run.startedAt)} by {run.startedBy === 'driver' ? run.driverName : 'the office'}
-            {run.endedAt ? ` · ended ${formatTime(run.endedAt)}` : ' · in progress'}
+            {run.special && <StatusBadge tone="amber">Special (not a regular collection day)</StatusBadge>} Collection run <strong>{run.id}</strong> · started {formatTime(run.startedAt)} by {run.startedBy === 'driver' ? run.driverName : 'the office'}
+            {run.endedAt
+              ? run.status === 'completed'
+                ? ` · all stops done, driver ended the shift at ${formatTime(run.endedAt)}`
+                : ` · ended early at ${formatTime(run.endedAt)}`
+              : ' · in progress'}
           </span>
         ) : (
-          <span>No collection run yet today. It starts when the driver taps Start Route (or when you record a stop here).</span>
+          <span>
+            {isPickupDate(todayISO(), data.scheduleExceptions)
+              ? 'No collection run yet today. It starts when the driver taps Start Route (or when you record a stop here).'
+              : `No regular collection today (${exceptionOn(todayISO(), data.scheduleExceptions)?.reason ?? `official days: ${scheduleLabel}`}). A stop you record here is saved as a special collection.`}
+          </span>
         )}
       </div>
 
@@ -179,7 +196,6 @@ export default function CollectionMonitoringPage() {
                     <th>Purok</th>
                     <th>Households</th>
                     <th>Status</th>
-                    <th className="is-right">View</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -188,6 +204,13 @@ export default function CollectionMonitoringPage() {
                       key={s.stop.id}
                       className={`is-clickable ${s.stop.id === selectedId ? 'is-selected' : ''}`}
                       onClick={() => setSelectedId(s.stop.id)}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setSelectedId(s.stop.id)
+                        }
+                      }}
                     >
                       <td>
                         <strong>
@@ -200,21 +223,6 @@ export default function CollectionMonitoringPage() {
                       <td>
                         <StatusBadge tone={stopStatusMeta[s.status].tone}>{stopStatusMeta[s.status].label}</StatusBadge>
                         {s.manual && <small>by {recordedBy(s.manual)}</small>}
-                      </td>
-                      <td>
-                        <div className="ct-table__actions">
-                          <button
-                            type="button"
-                            className="ct-icon-btn"
-                            aria-label={`View ${s.stop.name}`}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedId(s.stop.id)
-                            }}
-                          >
-                            <Eye size={16} />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}
@@ -313,6 +321,8 @@ export default function CollectionMonitoringPage() {
         )}
       </div>
 
+      <DriverIssuesCard issues={data.driverIssues ?? []} />
+
       {modal === 'missed' && selected && (
         <MarkMissedModal
           stop={selected.stop}
@@ -323,6 +333,24 @@ export default function CollectionMonitoringPage() {
             setModal(null)
           }}
         />
+      )}
+      {modal === 'endRun' && (
+        <ConfirmModal
+          title="End today’s route?"
+          confirmLabel="End Route"
+          onClose={() => setModal(null)}
+          onConfirm={() => {
+            dispatch({ type: 'run/end' }).then((res) => {
+              if (!res.ok) return
+              toast('Route ended and saved')
+            })
+          }}
+        >
+          <p>
+            Use this when the driver cannot finish (for example, a stop cannot be reached). {summary.collected} of {summary.total} stops are
+            collected; the rest are saved as not collected.
+          </p>
+        </ConfirmModal>
       )}
       {modal === 'clearAll' && (
         <ConfirmModal
@@ -340,5 +368,54 @@ export default function CollectionMonitoringPage() {
         </ConfirmModal>
       )}
     </div>
+  )
+}
+
+// Problems the driver reported from the Driver app (newest first).
+function DriverIssuesCard({ issues }) {
+  const shown = issues.slice(0, 15)
+  const today = todayISO()
+  const todayCount = issues.filter((x) => localDateISO(x.reportedAt) === today).length
+  return (
+    <article className="ct-card collection-issues">
+      <div className="ct-card__header">
+        <div>
+          <h2>
+            <Wrench size={16} /> Driver Problem Reports
+          </h2>
+          <p>
+            Sent by the driver from the Driver app · {todayCount} today · {issues.length} saved
+          </p>
+        </div>
+      </div>
+      <div className="ct-card__body">
+        {shown.length === 0 ? (
+          <p className="ct-empty">No problems reported by the driver.</p>
+        ) : (
+          <ul className="collection-issues__list">
+            {shown.map((x) => (
+              <li key={x.id}>
+                {x.photo && <AuthImage src={x.photo} alt={`Photo for ${x.id}`} className="collection-issues__photo" />}
+                <div>
+                  <div className="collection-issues__head">
+                    <strong>{x.issueLabel}</strong>
+                    <span className="ct-mono">{x.id}</span>
+                  </div>
+                  <p>{x.description}</p>
+                  <small>
+                    {formatDateTime(x.reportedAt)} · {x.driverName} · {x.stopName ?? 'Not at a stop'}
+                    {x.runId ? ` · ${x.runId}` : ''}
+                  </small>
+                  <div className="collection-issues__tags">
+                    {x.notifiedOffice && <StatusBadge tone="red">Urgent alert sent</StatusBadge>}
+                    {x.markedMissed && <StatusBadge tone="amber">Stop marked missed</StatusBadge>}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </article>
   )
 }
