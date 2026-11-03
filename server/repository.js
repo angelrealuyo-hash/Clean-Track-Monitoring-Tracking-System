@@ -50,7 +50,9 @@ export function loadState(db) {
     phone: d.phone,
     ...(d.email ? { email: d.email } : {}),
     license: d.license,
-    shift: d.shift,
+    truckId: d.truck_id ?? null,
+    shift: d.shift || null, // 'morning' | 'afternoon' | null
+    active: d.active !== 0,
     status: d.status,
     photo: d.photo ?? null,
     // 'active' | 'disabled' | 'none' (no sign-in account yet)
@@ -203,6 +205,7 @@ export function loadState(db) {
     role: c.role,
     phone: c.phone ?? '',
     truckId: c.truck_id,
+    shift: c.shift ?? null,
     status: c.status,
     photo: c.photo ?? null,
     createdAt: c.created_at,
@@ -260,8 +263,9 @@ export function saveState(db, state) {
     t.maintenance.forEach((m, i) => addMaint.run(t.id, i, m.date, m.type, m.odometerKm ?? null, m.notes ?? ''))
 
     db.exec('DELETE FROM drivers')
-    const addDriver = db.prepare('INSERT INTO drivers (id, name, initials, phone, email, license, shift, status, photo) VALUES (?,?,?,?,?,?,?,?,?)')
-    for (const d of state.drivers) addDriver.run(d.id, d.name, d.initials ?? '', d.phone ?? '', d.email ?? null, d.license ?? '', d.shift ?? '', d.status, d.photo ?? null)
+    const addDriver = db.prepare('INSERT INTO drivers (id, name, initials, phone, email, license, shift, status, photo, truck_id, active) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+    for (const d of state.drivers)
+      addDriver.run(d.id, d.name, d.initials ?? '', d.phone ?? '', d.email ?? null, d.license ?? '', d.shift ?? null, d.status, d.photo ?? null, d.truckId ?? null, d.active === false ? 0 : 1)
 
     db.exec('DELETE FROM routes; DELETE FROM route_stops;')
     const r = state.route
@@ -343,8 +347,8 @@ export function saveState(db, state) {
       addIssue.run(x.id, x.reportedAt, x.driverId ?? null, x.driverName ?? '', x.runId ?? null, x.stopId ?? null, x.stopName ?? null, x.issueType, x.issueLabel, x.description, x.photo ?? null, x.notifiedOffice ? 1 : 0, x.markedMissed ? 1 : 0)
 
     db.exec('DELETE FROM crew_members')
-    const addCrew = db.prepare('INSERT INTO crew_members (id, name, role, phone, truck_id, status, created_at, photo) VALUES (?,?,?,?,?,?,?,?)')
-    for (const c of state.crew ?? []) addCrew.run(c.id, c.name, c.role, c.phone || null, c.truckId ?? null, c.status, c.createdAt, c.photo ?? null)
+    const addCrew = db.prepare('INSERT INTO crew_members (id, name, role, phone, truck_id, status, created_at, photo, shift) VALUES (?,?,?,?,?,?,?,?,?)')
+    for (const c of state.crew ?? []) addCrew.run(c.id, c.name, c.role, c.phone || null, c.truckId ?? null, c.status, c.createdAt, c.photo ?? null, c.shift ?? null)
 
     const sim = state.simulation
     db.prepare(

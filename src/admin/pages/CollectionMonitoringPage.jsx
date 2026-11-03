@@ -13,6 +13,7 @@ import {
   TriangleAlert,
   Truck,
   Wrench,
+  X,
 } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
@@ -70,6 +71,14 @@ export default function CollectionMonitoringPage() {
       (!q || s.stop.name.toLowerCase().includes(q) || s.stop.id.toLowerCase().includes(q)),
   )
   const selected = stops.find((s) => s.stop.id === selectedId) ?? null
+  const filtered = Boolean(query) || purok !== 'all' || status !== 'all'
+
+  // Clear: empty the search box and show every stop again.
+  function clearSearch() {
+    setQuery('')
+    setPurok('all')
+    setStatus('all')
+  }
 
   function exportLog() {
     downloadCsv(
@@ -164,10 +173,22 @@ export default function CollectionMonitoringPage() {
 
       <div className="ct-split">
         <article className="ct-card">
-          <div className="ct-toolbar">
-            <div className="ct-input-group">
-              <Search size={16} />
-              <input type="search" placeholder="Search stop name or ID…" aria-label="Search stops" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <div className="ct-toolbar collection-toolbar">
+            <div className="collection-search">
+              <div className="ct-input-group">
+                <Search size={16} />
+                <input
+                  type="search"
+                  placeholder="Search stop name or ID…"
+                  aria-label="Search stops"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+                />
+              </div>
+              <button type="button" className="ct-btn ct-btn--secondary collection-search__clear" onClick={clearSearch} disabled={!filtered}>
+                <X size={15} /> Clear
+              </button>
             </div>
             <select className="ct-input" aria-label="Filter by purok" value={purok} onChange={(e) => setPurok(e.target.value)}>
               <option value="all">All puroks</option>

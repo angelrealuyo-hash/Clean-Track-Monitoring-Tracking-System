@@ -35,15 +35,21 @@ function migrate(db) {
   }
 }
 
-// Runs fn inside a transaction.
+// Runs fn inside a transaction. Savepoints make it safe to nest (an inner
+// call is undone together with the outer one).
+let depth = 0
 export function transaction(db, fn) {
-  db.exec('BEGIN')
+  const name = `sp${depth++}`
+  db.exec(`SAVEPOINT ${name}`)
   try {
     const result = fn()
-    db.exec('COMMIT')
+    db.exec(`RELEASE ${name}`)
     return result
   } catch (err) {
-    db.exec('ROLLBACK')
+    db.exec(`ROLLBACK TO ${name}`)
+    db.exec(`RELEASE ${name}`)
     throw err
+  } finally {
+    depth--
   }
 }

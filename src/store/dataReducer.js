@@ -168,13 +168,13 @@ export function dataReducer(state, action) {
       return { ...state, drivers: [...state.drivers, driver] }
     }
 
-    case 'driver/update':
-      return {
-        ...state,
-        drivers: state.drivers.map((d) =>
-          d.id === p.id ? { ...d, ...p.patch, ...(p.patch.name ? { initials: initials(p.patch.name) } : {}) } : d,
-        ),
-      }
+    case 'driver/update': {
+      const drivers = state.drivers.map((d) => (d.id === p.id ? { ...d, ...p.patch, ...(p.patch.name ? { initials: initials(p.patch.name) } : {}) } : d))
+      const updated = drivers.find((d) => d.id === p.id)
+      // The driver on duty must hold a slot on the truck (active, on a shift).
+      const leftTruck = state.truck.driverId === p.id && updated && !(updated.active !== false && updated.truckId === state.truck.id && updated.shift)
+      return { ...state, drivers, truck: leftTruck ? { ...state.truck, driverId: null } : state.truck }
+    }
 
     case 'driver/delete':
       return {

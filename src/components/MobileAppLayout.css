@@ -19,9 +19,43 @@
 }
 
 .mobile-header__title strong {
+  overflow: hidden;
   font-family: var(--ct-font-heading);
   font-size: 16px;
   color: var(--ct-green-900);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mobile-header__title span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mobile-header__right .status-badge {
+  white-space: nowrap;
+}
+
+/* Small phones (320-360px): tighter header so title, status and bell fit. */
+@media (max-width: 360px) {
+  .mobile-header {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  .mobile-header__title strong {
+    font-size: 15px;
+  }
+
+  .mobile-header__right {
+    gap: 4px;
+  }
+
+  .mobile-header__right .status-badge {
+    padding: 2px 8px;
+    font-size: 11px;
+  }
 }
 
 .mobile-header__title span {
@@ -67,7 +101,7 @@
   --mobile-sticky-top: var(--mobile-header-h, 56px);
 }
 
-@media (min-width: 520px) {
+@media (min-width: 1024px) {
   .mobile-content {
     overflow-y: auto;
   }

@@ -91,3 +91,21 @@
 .feedback-analytics .ct-alert .status-badge {
   vertical-align: middle;
 }
+
+.analytics-source {
+  align-items: center;
+}
+
+.fa-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.fa-legend .status-badge + * {
+  margin-right: 6px;
+}

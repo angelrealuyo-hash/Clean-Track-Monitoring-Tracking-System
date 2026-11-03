@@ -1,6 +1,15 @@
 /* Common page frame for Admin screens. */
 .admin-page {
+  max-width: 1680px;
+  margin-inline: auto;
   padding: 24px;
+}
+
+/* Laptops (sidebar visible, less room): slightly tighter page padding */
+@media (max-width: 1100px) {
+  .admin-page {
+    padding: 20px;
+  }
 }
 
 .admin-page__header {

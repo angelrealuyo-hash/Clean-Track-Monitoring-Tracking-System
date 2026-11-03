@@ -114,15 +114,14 @@ export default function ReportProblemPage() {
 
       <section className="m-card">
         <h2 className="m-section-title">Tell us more</h2>
-        <div className="res-gap">
+        <div className="res-gap m-form">
           <Field label="Where?" htmlFor="rp-loc" required error={errors.location} hint="We filled in your address. Change it if needed.">
             <div className="ct-input-group">
               <MapPin size={16} />
               <input id="rp-loc" value={form.location} onChange={set('location')} aria-invalid={!!errors.location} />
             </div>
           </Field>
-          <Field label="What happened? (optional)" htmlFor="rp-desc" error={errors.description}>
-            <span className="res-counter">{form.description.length}/250</span>
+          <Field label="What happened? (optional)" htmlFor="rp-desc" error={errors.description} aside={`${form.description.length}/250`}>
             <textarea
               id="rp-desc"
               className="ct-input"
@@ -139,7 +138,7 @@ export default function ReportProblemPage() {
           </div>
           <label className="ct-checkbox">
             <input type="checkbox" checked={form.smsUpdates} onChange={set('smsUpdates')} />
-            Show updates about this report in my Messages
+            <span>Show updates about this report in my Messages</span>
           </label>
         </div>
       </section>

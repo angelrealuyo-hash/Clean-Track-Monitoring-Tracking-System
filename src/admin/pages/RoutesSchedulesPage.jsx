@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ScheduleExceptionsCard from '../components/routes/ScheduleExceptionsCard.jsx'
 import { Link } from 'react-router-dom'
-import { ArrowDown, ArrowUp, CalendarDays, Clock, MapPin, MapPinPlus, Package, Pencil, Route as RouteIcon, Trash2, Truck, TriangleAlert } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, ChevronDown, ChevronUp, List, Clock, MapPin, MapPinPlus, Package, Pencil, Route as RouteIcon, Trash2, Truck, TriangleAlert } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
 import DetailPanel, { DetailSection } from '../components/DetailPanel.jsx'
@@ -22,6 +22,8 @@ import { isCollectionDay, scheduleLabel } from '../../data/schedule.js'
 import '../components/AdminPage.css'
 import './RoutesSchedulesPage.css'
 
+const STOPS_PREVIEW = 5
+
 // PDF pages 21-24. One route, driven by the barangay's one truck.
 export default function RoutesSchedulesPage() {
   const { data, dispatch } = useData()
@@ -39,6 +41,16 @@ export default function RoutesSchedulesPage() {
   const today = todayName()
   const close = () => setModal(null)
 
+  // Show the first few stops and only the collection days at first;
+  // "Show All" lists every stop and every day of the week.
+  const [showAll, setShowAll] = useState({ stops: false, days: false })
+  const shownStops = showAll.stops ? route.stops : route.stops.slice(0, STOPS_PREVIEW)
+  const shownDays = showAll.days ? weeklySchedule : weeklySchedule.filter((d) => isCollectionDay(d.day))
+  const canExpand = { stops: route.stops.length > STOPS_PREVIEW, days: shownDays.length < weeklySchedule.length || showAll.days }
+  const everythingShown = (!canExpand.stops || showAll.stops) && (!canExpand.days || showAll.days)
+  const toggleAll = () => setShowAll(everythingShown ? { stops: false, days: false } : { stops: true, days: true })
+  const flip = (key) => setShowAll((v) => ({ ...v, [key]: !v[key] }))
+
   return (
     <div className="admin-page">
       <PageHeader
@@ -46,9 +58,14 @@ export default function RoutesSchedulesPage() {
         badge="Barangay Operations"
         subtitle="Collection route, stop order, and the weekly collection timetable"
         actions={
-          <button type="button" className="ct-btn ct-btn--primary" onClick={() => setModal({ type: 'route' })}>
-            <Pencil size={16} /> Edit Route
-          </button>
+          <>
+            <button type="button" className="ct-btn ct-btn--secondary" onClick={toggleAll} aria-pressed={everythingShown}>
+              <List size={16} /> {everythingShown ? 'Show Less' : 'Show All'}
+            </button>
+            <button type="button" className="ct-btn ct-btn--primary" onClick={() => setModal({ type: 'route' })}>
+              <Pencil size={16} /> Edit Route
+            </button>
+          </>
         }
       />
 
@@ -96,7 +113,7 @@ export default function RoutesSchedulesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {route.stops.map((stop, i) => {
+                    {shownStops.map((stop, i) => {
                       const st = progress ? progress.statusOf(stop) : 'pending'
                       return (
                         <tr key={stop.id}>
@@ -166,6 +183,14 @@ export default function RoutesSchedulesPage() {
                 </table>
               </div>
             </div>
+            <ShowAllFoot
+              shown={shownStops.length}
+              total={route.stops.length}
+              noun="stops (depots included)"
+              expanded={showAll.stops}
+              canExpand={canExpand.stops}
+              onToggle={() => flip('stops')}
+            />
           </article>
 
           <article className="ct-card">
@@ -187,7 +212,7 @@ export default function RoutesSchedulesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {weeklySchedule.map((entry) => (
+                    {shownDays.map((entry) => (
                       <tr key={entry.day} className={entry.day === today ? 'is-selected' : ''}>
                         <td>
                           <strong>{entry.day}</strong>
@@ -217,6 +242,15 @@ export default function RoutesSchedulesPage() {
                 </table>
               </div>
             </div>
+            <ShowAllFoot
+              shown={shownDays.length}
+              total={weeklySchedule.length}
+              noun="days"
+              note={showAll.days ? null : 'Collection days only'}
+              expanded={showAll.days}
+              canExpand={canExpand.days}
+              onToggle={() => flip('days')}
+            />
           </article>
 
           <ScheduleExceptionsCard />
@@ -373,6 +407,31 @@ export default function RoutesSchedulesPage() {
             })
           }}
         />
+      )}
+    </div>
+  )
+}
+
+// Table footer: "Showing 5 of 10 stops" with a Show All / Show Less button.
+function ShowAllFoot({ shown, total, noun, note, expanded, canExpand, onToggle }) {
+  return (
+    <div className="ct-table__foot routes-foot">
+      <span>
+        Showing {shown} of {total} {noun}
+        {note ? ` · ${note}` : ''}
+      </span>
+      {canExpand && (
+        <button type="button" className="ct-btn ct-btn--soft routes-foot__btn" onClick={onToggle} aria-expanded={expanded}>
+          {expanded ? (
+            <>
+              <ChevronUp size={15} /> Show Less
+            </>
+          ) : (
+            <>
+              <ChevronDown size={15} /> Show All ({total})
+            </>
+          )}
+        </button>
       )}
     </div>
   )

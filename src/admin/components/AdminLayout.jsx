@@ -1,6 +1,6 @@
-import { Suspense, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, LogOut, Menu, Settings, X } from 'lucide-react'
+import { Bell, CheckCheck, ChevronRight, LogOut, Menu, Settings, X } from 'lucide-react'
 import Logo from '../../components/Logo.jsx'
 import PageLoader from '../../components/PageLoader.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
@@ -8,6 +8,10 @@ import Avatar from '../../components/Avatar.jsx'
 import { useAuth } from '../../auth/authContext.js'
 import { demoUsers } from '../../data/users.js'
 import { useData } from '../../store/dataContext.js'
+import SignOutConfirm from '../../components/SignOutConfirm.jsx'
+import { priorityMeta } from '../../store/selectors.js'
+import { formatDateTime } from '../../utils/format.js'
+import TopbarDropdown from './TopbarDropdown.jsx'
 import { adminNavGroups, findNavItem } from './adminNav.js'
 import './AdminLayout.css'
 
@@ -19,10 +23,17 @@ export default function AdminLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
-  const { data } = useData()
+  const [dropdown, setDropdown] = useState(null) // 'notifications' | 'profile' | null
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
+  const closeDropdown = useCallback(() => setDropdown(null), [])
+  const toggle = (name) => setDropdown((d) => (d === name ? null : name))
+  const { data, dispatch } = useData()
 
   const openReports = data.reports.filter((r) => r.status !== 'resolved').length
-  const unreadAdmin = data.notifications.filter((n) => n.audience === 'admin' && !n.read).length
+  const adminFeed = data.notifications.filter((n) => n.audience === 'admin')
+  const unreadAdmin = adminFeed.filter((n) => !n.read).length
+  // Newest first; the dropdown shows a short preview.
+  const preview = [...adminFeed].sort((a, b) => String(b.time).localeCompare(String(a.time))).slice(0, 5)
   const badges = {
     truck: { text: '1 Truck', className: 'admin-nav__badge--soft' },
     reports: openReports ? { text: openReports, className: 'admin-nav__badge--amber' } : null,
@@ -31,10 +42,28 @@ export default function AdminLayout() {
 
   const current = findNavItem(location.pathname)
 
+  // Each admin page opens at the top (with its title and buttons visible),
+  // not at the scroll position of the previous page.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+
   function signOut() {
     // Navigate first so the next sign-in starts at the Dashboard.
     navigate('/admin/login', { replace: true })
     logout('admin')
+  }
+
+  function askSignOut() {
+    setDropdown(null)
+    setMenuOpen(false)
+    setConfirmSignOut(true)
+  }
+
+  function openNotification(n) {
+    setDropdown(null)
+    if (!n.read) dispatch({ type: 'notification/markRead', payload: { id: n.id } })
+    navigate(`/admin/notifications?id=${encodeURIComponent(n.id)}`)
   }
 
   return (
@@ -79,27 +108,15 @@ export default function AdminLayout() {
               })}
             </ul>
           ))}
-          <button type="button" className="admin-nav__link" onClick={signOut}>
+        </nav>
+
+        {/* Sign Out sits at the bottom of the sidebar. */}
+        <div className="admin-sidebar__footer">
+          <button type="button" className="admin-nav__link admin-nav__signout" onClick={askSignOut}>
             <LogOut size={18} />
             <span>Sign Out</span>
           </button>
-        </nav>
-
-        {/* Profile opens Settings (My Account is the first section there). */}
-        <Link
-          to="/admin/settings"
-          className="admin-profile"
-          onClick={() => setMenuOpen(false)}
-          aria-label={`${user.name}, open Settings`}
-          title="Open Settings"
-        >
-          <Avatar photo={data.adminPhoto} initials={user.initials} className="admin-avatar" />
-          <div>
-            <strong>{user.name}</strong>
-            <span>{user.title}</span>
-          </div>
-          <Settings size={16} className="admin-profile__icon" aria-hidden="true" />
-        </Link>
+        </div>
       </aside>
 
       <div className="admin-backdrop" onClick={() => setMenuOpen(false)} />
@@ -123,13 +140,90 @@ export default function AdminLayout() {
           </nav>
           <div className="admin-topbar__right">
             <StatusBadge tone="green">Simulated Demo Mode</StatusBadge>
-            <Link to="/admin/notifications" className="ct-icon-btn admin-topbar__bell" aria-label="Notifications">
-              <Bell size={20} />
-              {unreadAdmin > 0 && <span className="admin-topbar__dot" />}
-            </Link>
-            <Link to="/admin/settings" className="admin-avatar--link" title={`${user.name} · Settings`} aria-label={`${user.name}, open Settings`}>
-              <Avatar photo={data.adminPhoto} initials={user.initials} className="admin-avatar admin-avatar--small" />
-            </Link>
+            <TopbarDropdown
+              open={dropdown === 'notifications'}
+              onToggle={() => toggle('notifications')}
+              onClose={closeDropdown}
+              buttonLabel={unreadAdmin ? `Notifications, ${unreadAdmin} unread` : 'Notifications'}
+              buttonClassName="ct-icon-btn admin-topbar__bell"
+              panelClassName="topbar-dd__panel--notif"
+              button={
+                <>
+                  <Bell size={20} />
+                  {unreadAdmin > 0 && <span className="admin-topbar__dot" />}
+                </>
+              }
+            >
+              <div className="topbar-dd__head">
+                <strong>Notifications</strong>
+                {unreadAdmin > 0 ? (
+                  <button
+                    type="button"
+                    className="ct-link-btn"
+                    onClick={() => dispatch({ type: 'notification/markAllRead', payload: { audience: 'admin' } })}
+                  >
+                    <CheckCheck size={13} /> Mark all read
+                  </button>
+                ) : (
+                  <span className="topbar-dd__muted">All caught up</span>
+                )}
+              </div>
+              {preview.length === 0 ? (
+                <p className="topbar-dd__empty">No notifications yet.</p>
+              ) : (
+                <ul className="topbar-dd__list">
+                  {preview.map((n) => (
+                    <li key={n.id}>
+                      <button type="button" className={`topbar-dd__notif ${n.read ? '' : 'is-unread'}`} onClick={() => openNotification(n)}>
+                        <span className={`topbar-dd__prio is-${priorityMeta[n.priority]?.tone ?? 'green'}`} aria-hidden="true" />
+                        <span className="topbar-dd__notif-text">
+                          <strong>{n.title}</strong>
+                          {n.body && <span>{n.body}</span>}
+                          <small>
+                            {formatDateTime(n.time)}
+                            {!n.read && ' · Unread'}
+                          </small>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link to="/admin/notifications" className="topbar-dd__foot" onClick={closeDropdown}>
+                View all notifications <ChevronRight size={14} />
+              </Link>
+            </TopbarDropdown>
+
+            <TopbarDropdown
+              open={dropdown === 'profile'}
+              onToggle={() => toggle('profile')}
+              onClose={closeDropdown}
+              buttonLabel={`${user.name}, account menu`}
+              buttonClassName="admin-avatar--link"
+              panelClassName="topbar-dd__panel--profile"
+              button={<Avatar photo={data.adminPhoto} initials={user.initials} className="admin-avatar admin-avatar--small" />}
+            >
+              <div className="topbar-dd__user">
+                <Avatar photo={data.adminPhoto} initials={user.initials} className="admin-avatar" />
+                <div>
+                  <strong>{user.name}</strong>
+                  <span>{user.title}</span>
+                  {user.email && <small>{user.email}</small>}
+                </div>
+              </div>
+              <ul className="topbar-dd__menu">
+                <li>
+                  <Link to="/admin/settings" onClick={closeDropdown}>
+                    <Settings size={16} /> Account &amp; Settings
+                  </Link>
+                </li>
+                <li>
+                  <button type="button" className="is-danger" onClick={askSignOut}>
+                    <LogOut size={16} /> Sign Out
+                  </button>
+                </li>
+              </ul>
+            </TopbarDropdown>
           </div>
         </header>
         <main className="admin-content">
@@ -138,6 +232,7 @@ export default function AdminLayout() {
           </Suspense>
         </main>
       </div>
+      {confirmSignOut && <SignOutConfirm onClose={() => setConfirmSignOut(false)} onConfirm={signOut} />}
     </div>
   )
 }

@@ -317,3 +317,148 @@
 .ct-table .ct-mono {
   white-space: nowrap;
 }
+
+/* Phones: each table row becomes a small card. Every cell shows its column
+   heading on the left (data-label, set by utils/responsiveTables.js) and its
+   value on the right, so nothing is cut off and nothing scrolls sideways. */
+@media (max-width: 640px) {
+  .ct-table-wrap {
+    overflow-x: visible;
+  }
+
+  .ct-table {
+    min-width: 0;
+    font-size: 13px;
+  }
+
+  .ct-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .ct-table,
+  .ct-table tbody,
+  .ct-table tfoot,
+  .ct-table tr,
+  .ct-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ct-table tr {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ct-border);
+  }
+
+  .ct-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .ct-table td {
+    position: relative;
+    min-height: 26px;
+    padding: 5px 0 5px 42%;
+    text-align: right;
+    overflow-wrap: anywhere;
+    border: 0;
+  }
+
+  .ct-table td::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 6px;
+    left: 0;
+    width: 40%;
+    padding-right: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    text-align: left;
+    text-transform: uppercase;
+    color: var(--ct-text-muted);
+  }
+
+  .ct-table td[data-label='']::before {
+    content: none;
+  }
+
+  .ct-table td[data-label=''] {
+    padding-left: 0;
+  }
+
+  /* The first cell (name / ID) is the card's title. */
+  .ct-table td:first-child:not([data-label='#']) {
+    padding: 2px 0 6px;
+    font-size: 14px;
+    text-align: left;
+  }
+
+  .ct-table td:first-child:not([data-label='#'])::before {
+    content: none;
+  }
+
+  /* Numbered tables (Routes): "Stop #2" above the stop name (the title). */
+  .ct-table td[data-label='#'] {
+    min-height: 0;
+    padding: 0 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    color: var(--ct-text-muted);
+  }
+
+  .ct-table td[data-label='#']::before {
+    content: 'Stop #';
+    position: static;
+    width: auto;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .ct-table td[data-label='#'] + td {
+    padding: 0 0 6px;
+    font-size: 14px;
+    text-align: left;
+  }
+
+  .ct-table td[data-label='#'] + td::before {
+    content: none;
+  }
+
+  .ct-table .ct-table__actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .ct-table .ct-person {
+    justify-content: inherit;
+  }
+
+  .ct-table tfoot td {
+    background: none;
+  }
+
+  .ct-table tbody tr.is-selected {
+    box-shadow: inset 3px 0 0 var(--ct-green-900);
+  }
+
+  .ct-toolbar {
+    padding: 10px;
+  }
+
+  .ct-card__header {
+    padding: 14px 14px 0;
+  }
+
+  .ct-card__body {
+    padding: 14px;
+  }
+}

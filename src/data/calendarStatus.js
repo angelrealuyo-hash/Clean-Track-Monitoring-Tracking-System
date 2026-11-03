@@ -1,5 +1,6 @@
 // What the Resident calendar shows for one date, from saved records only.
-//   'holiday'   – admin set a holiday / suspension (shown instead of the truck)
+//   'holiday'   – an official Philippine holiday (any weekday) or a holiday /
+//                 suspension set by the barangay: no pickup (shown instead of the truck)
 //   'done'      – the resident confirmed they disposed of their garbage
 //   'skipped'   – the resident answered "not today" (explicit skip)
 //   'missed'    – they said they could NOT dispose, or a pickup check went out,
@@ -7,6 +8,7 @@
 //   'scheduled' – a regular pickup day (truck), no result (yet)
 //   null        – not a pickup day
 import { exceptionOn, isCollectionDate } from './schedule.js'
+import { phHolidayOn } from '../resident/data/phHolidays.js'
 
 /**
  * @param {string} iso       'YYYY-MM-DD'
@@ -14,10 +16,13 @@ import { exceptionOn, isCollectionDate } from './schedule.js'
  *                             Pick Up Check was sent), since ('YYYY-MM-DD' the resident joined) }
  */
 export function dayStatus(iso, { today, exceptions = [], feedback = [], checkDates = new Set(), since = '' }) {
-  if (!isCollectionDate(iso)) return null
-  const ex = exceptionOn(iso, exceptions)
-  if (ex) return { status: 'holiday', exception: ex }
+  const official = phHolidayOn(iso)
+  const collectionDay = isCollectionDate(iso)
+  if (!collectionDay && !official) return null
   const answer = feedback.find((f) => f.date === iso) ?? null
+  const ex = collectionDay ? exceptionOn(iso, exceptions) : null
+  // Holidays cancel the regular pickup. A saved answer (older records) is still shown.
+  if (official || ex) return { status: 'holiday', official, exception: ex, collectionDay, answer }
   if (answer?.disposed === true) return { status: 'done', answer }
   if (answer && answer.willDispose === false) return { status: 'skipped', answer }
   if (answer?.disposed === false) return { status: 'missed', answer }
@@ -32,5 +37,5 @@ export const calendarLegend = {
   done: 'You disposed of your garbage',
   skipped: 'You skipped (not putting out garbage)',
   missed: 'Not completed',
-  holiday: 'Holiday / no pickup',
+  holiday: 'Holiday / no pickup (official holiday or barangay notice)',
 }

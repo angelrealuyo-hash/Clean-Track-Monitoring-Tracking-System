@@ -1,4 +1,6 @@
-// 'on-shift' | 'standby' | 'off-duty'
+// status = availability today: 'on-shift' | 'standby' | 'off-duty'
+// truckId + shift ('morning' | 'afternoon') = place on the truck roster (see data/personnel.js)
+// active = false frees the roster slot
 export const drivers = [
   {
     id: 'DRV-01',
@@ -6,7 +8,9 @@ export const drivers = [
     initials: 'CO',
     phone: '+63 917 555 0142',
     license: 'Professional Driver (Class 2)',
-    shift: 'Morning Shift (06:00 AM - 02:00 PM)',
+    truckId: 'TRK-01',
+    shift: 'morning',
+    active: true,
     status: 'on-shift',
   },
   {
@@ -15,13 +19,10 @@ export const drivers = [
     initials: 'MR',
     phone: '+63 917 555 0199',
     license: 'Professional Driver (Class 2)',
-    shift: 'Relief Driver',
+    truckId: 'TRK-01',
+    shift: 'afternoon',
+    active: true,
     status: 'standby',
   },
 ]
 
-export const shiftOptions = [
-  'Morning Shift (06:00 AM - 02:00 PM)',
-  'Afternoon Shift (02:00 PM - 10:00 PM)',
-  'Relief Driver',
-]

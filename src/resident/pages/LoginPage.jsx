@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
-import { ArrowRight, Bell, Eye, EyeOff, Info, Lock, User, Zap } from 'lucide-react'
+import { ArrowRight, Bell, Info, Lock, User, Zap } from 'lucide-react'
+import PasswordToggle from '../../components/PasswordToggle.jsx'
 import MobileFrame from '../../components/MobileFrame.jsx'
 import Logo from '../../components/Logo.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
@@ -109,14 +110,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-              <button
-                type="button"
-                className="ct-icon-btn"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+              <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((v) => !v)} />
             </div>
           </div>
 

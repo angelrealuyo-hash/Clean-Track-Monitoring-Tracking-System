@@ -5,7 +5,8 @@ import { dataReducer, nextId, currentRun } from '../src/store/dataReducer.js'
 import { createInitialData } from '../src/store/initialData.js'
 import { viewFor } from '../src/store/view.js'
 import { computeSimulation, isCollectionStop } from '../src/services/trackingSimulation.js'
-import { isCollectionDay, isPickupDate, scheduleLabel } from '../src/data/schedule.js'
+import { isCollectionDay, scheduleLabel } from '../src/data/schedule.js'
+import { isResidentPickupDate } from '../src/resident/data/phHolidays.js'
 import { storeActionImage, removeUnusedImages } from './uploads.js'
 import { demoUsers } from '../src/data/users.js'
 import { to24h, todayISO, todayName } from '../src/utils/format.js'
@@ -41,8 +42,20 @@ export function createService(db) {
     insertAccount(db, { id: `ACC-${a.resident.id}`, role: 'resident', refId: a.resident.id, email: a.resident.email, phone: a.resident.phone, passwordHash: hashPassword(a.resident.password) })
   }
 
-  function commit(next) {
-    saveState(db, next)
+  function commit(next, effects = () => {}) {
+    try {
+      // Side effects (accounts) and the data are saved together: all or nothing.
+      transaction(db, () => {
+        effects()
+        saveState(db, next)
+      })
+    } catch (err) {
+      // Database safeguards for the personnel limits (migration 007).
+      if (/PERSONNEL_SHIFT_FULL|drivers_one_per_shift|UNIQUE constraint failed: drivers\.truck_id/.test(err?.message ?? ''))
+        throw new HttpError(409, 'That shift is already full. Refresh the page to see the current personnel.')
+      if (/PERSONNEL_INVALID_SHIFT/.test(err?.message ?? '')) throw new HttpError(400, 'Shift is not valid.')
+      throw err
+    }
     state = { ...next, version: (next.version ?? 0) + 1 }
     for (const fn of listeners) fn(state.version)
   }
@@ -143,8 +156,7 @@ export function createService(db) {
     const before = state
     const next = dataReducer(state, action)
     if (next !== state) {
-      transaction(db, () => runEffects(effects, before, next))
-      commit(next)
+      commit(next, () => runEffects(effects, before, next))
       if (LOGGED_ACTIONS.has(action.type)) logTruck(state, action.type)
       if (hadImage || /photo/i.test(JSON.stringify(rawAction.payload ?? {}))) removeUnusedImages(db, state)
       kickEmail()
@@ -213,8 +225,9 @@ export function createService(db) {
     // Pickup-day reminder, once per day.
     const today = todayISO()
     // Official collection days only (Mon/Wed/Fri), whatever the saved rows say.
-    // Holidays / suspensions set by the admin cancel the day's pickup too.
-    const run = isCollectionDay(todayName()) && isPickupDate(todayISO(), state.scheduleExceptions) ? state.weeklySchedule.find((d) => d.day === todayName()) : null
+    // Official Philippine holidays and the admin's holidays / suspensions cancel
+    // the residents' pickup (no reminder, no Pick Up Check). Never moved.
+    const run = isCollectionDay(todayName()) && isResidentPickupDate(todayISO(), state.scheduleExceptions) ? state.weeklySchedule.find((d) => d.day === todayName()) : null
     if (s.autoScheduleReminders && run) {
       const start = run.window.split(' - ')[0]
       const added = addAuto({

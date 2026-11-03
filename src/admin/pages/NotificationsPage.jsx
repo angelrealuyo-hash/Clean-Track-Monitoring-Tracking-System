@@ -53,7 +53,14 @@ export default function NotificationsPage() {
   const high = feed.filter((n) => n.priority === 'high').length
 
   const [onlyUnread, setOnlyUnread] = useState(false)
-  const [selectedId, setSelectedId] = useState(feed[0]?.id ?? null)
+  // ?id=N-001 (from the top-bar notification dropdown) opens that notification.
+  const linkedId = params.get('id')
+  const [selectedId, setSelectedId] = useState(() => (feed.some((n) => n.id === linkedId) ? linkedId : (feed[0]?.id ?? null)))
+  const [shownLinkedId, setShownLinkedId] = useState(linkedId)
+  if (linkedId !== shownLinkedId) {
+    setShownLinkedId(linkedId)
+    if (linkedId && feed.some((n) => n.id === linkedId)) setSelectedId(linkedId)
+  }
   const [outboxQuery, setOutboxQuery] = useState('')
   const [composeOpen, setComposeOpen] = useState(false)
 

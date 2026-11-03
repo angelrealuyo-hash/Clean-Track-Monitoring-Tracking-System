@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import {
   CircleCheck,
-  Eye,
-  EyeOff,
   KeyRound,
   Lock,
   LogIn,
@@ -11,6 +9,7 @@ import {
   Send,
   User,
 } from 'lucide-react'
+import PasswordToggle from '../../components/PasswordToggle.jsx'
 import logoUrl from '../../assets/cleantrack-logo.png'
 import Modal from '../../components/Modal.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
@@ -157,14 +156,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-              <button
-                type="button"
-                className="ct-icon-btn"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+              <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((v) => !v)} />
             </div>
           </div>
 

@@ -67,3 +67,13 @@
   margin-top: 8px;
   color: var(--ct-text-muted);
 }
+
+/* "Showing 5 of 10" + Show All button under the tables */
+.routes-foot {
+  align-items: center;
+}
+
+.routes-foot__btn {
+  padding: 6px 12px;
+  font-size: 13px;
+}

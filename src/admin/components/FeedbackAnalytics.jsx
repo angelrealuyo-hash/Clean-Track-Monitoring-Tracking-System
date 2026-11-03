@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarRange, CircleCheck, ClipboardCheck, Download, MessageSquareText, Truck, Users } from 'lucide-react'
+import { CalendarRange, CircleCheck, Download, MessageSquareText, Truck, Users } from 'lucide-react'
 import StatCard from './StatCard.jsx'
 import BarList from './charts/BarList.jsx'
 import StatusBar from './charts/StatusBar.jsx'
@@ -93,10 +93,7 @@ export default function FeedbackAnalytics({ feedback, runs, residentCount }) {
           <h2 id="fa-title">
             <MessageSquareText size={18} /> Resident Collection Participation
           </h2>
-          <p>
-            Answers from the Resident app (“Will you dispose of your garbage today?”). One answer per resident per day; the latest answer is
-            kept.
-          </p>
+          <p>Daily answers from the Resident app (latest answer per resident).</p>
         </div>
         <div className="fa-filters" role="group" aria-label="Reporting period">
           <CalendarRange size={16} aria-hidden="true" />
@@ -123,13 +120,12 @@ export default function FeedbackAnalytics({ feedback, runs, residentCount }) {
         </div>
       )}
 
-      <div className="ct-alert">
-        <ClipboardCheck size={16} />
-        <span>
-          <StatusBadge tone="blue">Resident-reported</StatusBadge> figures are what residents answered and are not proof of pickup.{' '}
-          <StatusBadge tone="green">Driver-confirmed</StatusBadge> figures come from stops the driver (or office) marked as collected.
-        </span>
-      </div>
+      <p className="fa-legend">
+        <StatusBadge tone="blue">Resident-reported</StatusBadge>
+        <span>what residents said</span>
+        <StatusBadge tone="green">Driver-confirmed</StatusBadge>
+        <span>stops marked collected</span>
+      </p>
 
       <section className="ct-stats" aria-label={`Participation, ${periodLabel}`}>
         <StatCard label="Residents Who Answered" icon={Users} value={s.residents} unit={`of ${residentCount}`} tone="blue">
@@ -214,7 +210,7 @@ export default function FeedbackAnalytics({ feedback, runs, residentCount }) {
             {reasonItems.length ? (
               <BarList items={reasonItems} unit="answers" label="Reasons for not disposing" />
             ) : (
-              <p className="ct-empty">No resident reported being unable to dispose in this period.</p>
+              <p className="ct-empty">None in this period.</p>
             )}
           </div>
         </article>
@@ -224,7 +220,7 @@ export default function FeedbackAnalytics({ feedback, runs, residentCount }) {
         <div className="ct-card__header">
           <div>
             <h2>By Date: Residents vs. Driver</h2>
-            <p>Each day&apos;s resident answers next to the stops the driver confirmed</p>
+            <p>Resident answers vs. driver-confirmed stops</p>
           </div>
         </div>
         <div className="ct-card__body">
@@ -273,7 +269,7 @@ export default function FeedbackAnalytics({ feedback, runs, residentCount }) {
         <div className="ct-card__header">
           <div>
             <h2>Resident Feedback Needing Attention</h2>
-            <p>Residents who said they could not dispose of their garbage, newest first</p>
+            <p>Could not dispose · newest first</p>
           </div>
         </div>
         <div className="ct-card__body">

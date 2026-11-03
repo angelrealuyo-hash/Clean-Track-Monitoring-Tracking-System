@@ -1,4 +1,4 @@
-import { Suspense, useLayoutEffect, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import MobileFrame from './MobileFrame.jsx'
 import PageLoader from './PageLoader.jsx'
@@ -10,6 +10,14 @@ import './MobileAppLayout.css'
 export default function MobileAppLayout({ header, tabs }) {
   const { pathname } = useLocation()
   const headerRef = useRef(null)
+  const contentRef = useRef(null)
+
+  // Each screen opens at the top: the page scrolls on phones and tablets,
+  // the content area scrolls inside the desktop phone frame.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    if (contentRef.current) contentRef.current.scrollTop = 0
+  }, [pathname])
 
   // Share the header height, so sticky bars inside pages sit just below it.
   useLayoutEffect(() => {
@@ -33,7 +41,7 @@ export default function MobileAppLayout({ header, tabs }) {
       <header className="mobile-header" ref={headerRef}>
         {header}
       </header>
-      <main className="mobile-content">
+      <main className="mobile-content" ref={contentRef}>
         <Suspense fallback={<PageLoader />}>
           <Outlet />
         </Suspense>

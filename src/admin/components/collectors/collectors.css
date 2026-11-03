@@ -1,0 +1,123 @@
+/* Collector's Management: role colours (Driver = blue, Crew Member = green) */
+.role-badge {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.role-badge--sm {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.role-badge--driver {
+  color: #1e40af;
+  background: var(--ct-blue-100);
+  border-color: #b9cffb;
+}
+
+.role-badge--crew {
+  color: var(--ct-green-900);
+  background: var(--ct-green-100);
+  border-color: #bfe3cc;
+}
+
+/* Form: role and shift choice cards */
+.col-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  /* Same space below each group as below a normal field, so the next
+     label (Shift, Status, Mobile Number) does not touch the cards above. */
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.col-choices legend {
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.col-choice {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+  cursor: pointer;
+}
+
+.col-choice input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--ct-green-900);
+}
+
+.col-choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.col-choice strong {
+  font-size: 14px;
+}
+
+.col-choice small {
+  font-size: 12px;
+  color: var(--ct-text-muted);
+}
+
+.col-choice:has(input:checked) {
+  background: var(--ct-green-50);
+  border-color: var(--ct-green-700);
+  box-shadow: inset 0 0 0 1px var(--ct-green-700);
+}
+
+.col-choice--driver:has(input:checked) {
+  background: #f1f6ff;
+  border-color: var(--ct-blue-600);
+  box-shadow: inset 0 0 0 1px var(--ct-blue-600);
+}
+
+.col-choice--driver input {
+  accent-color: var(--ct-blue-600);
+}
+
+.col-choice:has(input:disabled) {
+  cursor: not-allowed;
+  background: #f5f7f6;
+}
+
+.col-choice:has(input:disabled) strong {
+  color: var(--ct-text-muted);
+}
+
+.col-choice:has(input:focus-visible) {
+  outline: 2px solid var(--ct-green-700);
+  outline-offset: 2px;
+}
+
+.col-choice__full {
+  font-weight: 700;
+  color: var(--ct-red-600) !important;
+}
+
+.col-form-note {
+  grid-column: 1 / -1;
+  margin: -6px 0 16px;
+}

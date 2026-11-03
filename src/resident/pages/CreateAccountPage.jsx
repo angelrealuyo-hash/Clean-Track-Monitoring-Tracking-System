@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Eye, EyeOff, House, Lock, Mail, MapPin, Phone, ShieldCheck, User, UserPlus } from 'lucide-react'
+import { ArrowLeft, House, Lock, Mail, MapPin, Phone, ShieldCheck, User, UserPlus } from 'lucide-react'
+import PasswordToggle from '../../components/PasswordToggle.jsx'
 import MobileFrame from '../../components/MobileFrame.jsx'
 import Logo from '../../components/Logo.jsx'
 import Field from '../../components/Field.jsx'
@@ -116,9 +117,7 @@ export default function CreateAccountPage() {
             <div className="ct-input-group">
               <Lock size={16} />
               <input id="su-pw" type={show ? 'text' : 'password'} autoComplete="new-password" value={form.password} onChange={set('password')} aria-invalid={!!errors.password} />
-              <button type="button" className="ct-icon-btn" onClick={() => setShow((v) => !v)} aria-label={show ? 'Hide passwords' : 'Show passwords'}>
-                {show ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+              <PasswordToggle visible={show} onToggle={() => setShow((v) => !v)} />
             </div>
             {form.password && (
               <div className={`signup-strength is-${strength}`} aria-live="polite">
