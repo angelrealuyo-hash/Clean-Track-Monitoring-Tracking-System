@@ -3,7 +3,7 @@ import { useTracking } from '../../tracking/trackingContext.js'
 import { useResident } from '../../auth/useAccount.js'
 import { truckDistanceToPurok } from '../../store/selectors.js'
 import { todayISO, todayName } from '../../utils/format.js'
-import { exceptionOn, isPickupDate } from '../../data/schedule.js'
+import { isResidentPickupDate, pickupCancelledBy } from '../data/phHolidays.js'
 
 // Where the (simulated) truck is relative to the signed-in resident's purok,
 // as words and a badge colour. Shared by Home and Track Truck.
@@ -13,9 +13,9 @@ export function useTruckForResident() {
   const resident = useResident()
   const today = todayName()
   const todaysRun = data.weeklySchedule.find((d) => d.day === today)
-  // Official pickup days only (Mon/Wed/Fri).
-  const collectionToday = Boolean(todaysRun) && isPickupDate(todayISO(), data.scheduleExceptions)
-  const todayException = exceptionOn(todayISO(), data.scheduleExceptions)
+  // Official pickup days only (Mon/Wed/Fri), not on holidays.
+  const collectionToday = Boolean(todaysRun) && isResidentPickupDate(todayISO(), data.scheduleExceptions)
+  const todayException = pickupCancelledBy(todayISO(), data.scheduleExceptions)
   const distance = resident ? truckDistanceToPurok(tracking.route, tracking.state, resident.purok) : { state: 'none' }
   const paused = tracking.state.status === 'paused'
 

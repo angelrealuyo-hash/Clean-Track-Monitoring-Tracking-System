@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Bell, Building2, Phone, Database, History, KeyRound, RotateCcw, Save, SlidersHorizontal, Truck, UserCog } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowLeft, Bell, Building2, Phone, Database, KeyRound, RotateCcw, Save, SlidersHorizontal, Truck, UserCog } from 'lucide-react'
 import ChangePasswordModal from '../../components/ChangePasswordModal.jsx'
 import AvatarPicker from '../../components/AvatarPicker.jsx'
 import { useAuth } from '../../auth/authContext.js'
@@ -9,7 +10,6 @@ import ConfirmModal from '../../components/ConfirmModal.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useToast } from '../../components/toast/toastContext.js'
-import { formatDateTime } from '../../utils/format.js'
 import { defaultSettings } from '../../store/initialData.js'
 import '../components/AdminPage.css'
 import './SettingsPage.css'
@@ -112,7 +112,14 @@ export default function SettingsPage() {
   return (
     <div className="admin-page settings-page">
       <PageHeader
-        eyebrow={<>Administration / <b>System Settings</b></>}
+        eyebrow={
+          <>
+            <Link to="/admin" className="settings-back">
+              <ArrowLeft size={12} /> Dashboard
+            </Link>{' '}
+            / <b>Account &amp; Settings</b>
+          </>
+        }
         title="System Settings"
         subtitle="Barangay details, collection rules, and notification preferences"
         actions={actions}
@@ -264,9 +271,9 @@ export default function SettingsPage() {
       </Section>
 
       <footer className="settings-footer">
-        <span>
-          <History size={14} /> {data.savedAt ? `Last saved: ${formatDateTime(data.savedAt)}` : 'Using default settings'}
-        </span>
+        <Link to="/admin" className="settings-back">
+          <ArrowLeft size={14} /> Back to Dashboard
+        </Link>
         <div className="admin-page__actions">{actions}</div>
       </footer>
 

@@ -71,3 +71,25 @@
   background: var(--ct-green-50);
   border-top: 1px solid var(--ct-border);
 }
+
+.ct-modal--sm {
+  max-width: 380px;
+}
+
+.ct-modal__body p.ct-signout-text {
+  margin: 4px 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ct-text);
+}
+
+/* Phones: footer buttons share the width instead of overflowing */
+@media (max-width: 420px) {
+  .ct-modal__footer {
+    flex-wrap: wrap;
+  }
+
+  .ct-modal__footer > .ct-btn {
+    flex: 1 1 auto;
+  }
+}

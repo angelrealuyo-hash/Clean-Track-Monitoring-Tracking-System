@@ -100,18 +100,44 @@ another day is saved as a **special** run. Residents are not asked to sort waste
 
 **Holidays & suspended pickups** (Routes & Schedules): the admin can mark a future Monday/Wednesday/Friday as a
 holiday or suspension, with a reason. That date then has no regular pickup anywhere (no Start Route, reminder or
-Pick Up Check), residents get a message, and the Resident calendar shows it. No holiday dates are built in.
+Pick Up Check), residents get a message, and the Resident calendar shows it.
+
+**Official Philippine holidays (Resident app only)**: `src/resident/data/phHolidays.js` lists each year's nationwide
+regular holidays and special (non-working) days, copied from the presidential proclamations (2025: Proc. 727, 839,
+878, 911, 729; 2026: Proc. 1006, 1189, 1264; 2027: Proc. 1427). On those dates residents get no regular pickup,
+no pickup reminder and no Pick Up Check (the server refuses answers too), and the calendar shows **!** with the
+holiday's name on any weekday. Pickup is never moved to another day. Special *working* days (EDSA anniversary)
+and regional days (e.g. NCR-only) are not included. A year without a listed proclamation shows no holidays (the
+calendar says so); add the next year's proclamation, plus its Eid'l Fitr / Eid'l Adha proclamations, to that
+file. The Admin and Driver apps do not use this list.
 
 **Resident calendar** (Pickup Days): a month calendar with an icon on each pickup day, from saved records:
 truck = pickup scheduled; check = the resident said they disposed of their garbage; skip = they answered "not
 today"; X = they could not dispose, or a Pick Up Check was sent, the day passed and it was never completed;
-! = holiday/suspension. Future days are never marked X.
+! = official holiday or barangay holiday/suspension. Future days are never marked X.
 
 ### Admin: Collector's Management, profile, sign-in
 
-**Collector's Management** has one tab per saved truck (plus **Unassigned**) showing that truck's driver and crew as
-picture cards; details and actions open from each card. Drivers keep their sign-in account, availability and truck/route assignment; crew members do not sign in
-(`crew_members`). Settings is not in the sidebar: the top-right picture/initials and the bottom-left profile open it.
+**Collector's Management** is one overview of Truck 1 (no truck tabs): a personnel capacity summary, then the
+**Morning Shift** (06:00 AM - 02:00 PM) and **Afternoon Shift** (02:00 PM - 10:00 PM) as picture cards. Drivers have a
+blue **Driver** badge and crew a green **Crew Member** badge (always with the role name). **Add Collector** adds either
+role. Drivers keep their sign-in account and availability; crew members do not sign in (`crew_members`).
+
+Personnel limits (rules in `src/data/personnel.js`, enforced by `server/policy.js` and by database triggers/indexes
+from `server/migrations/007_personnel_shifts.sql`):
+
+- Each shift: at most **1 active Driver** and **3 active Crew Members**, so at most 2 Drivers, 6 Crew Members and 8 people.
+- **Only active people take a place.** Marking someone Inactive keeps their record and shift but frees the place;
+  making them Active again (or moving them to another shift) needs a free place there.
+- Editing a name, mobile number, picture or position never re-checks the limit; the person's own place is left out
+  when a change is checked.
+- The same name cannot be listed twice (blocks double submissions). Role (Driver / Crew Member) is fixed after adding;
+  to change it, add the person again with the other role and remove the old record.
+- The truck's driver on duty must be an active Morning or Afternoon Shift driver; making them inactive or taking them
+  off a shift clears it (refused while a route is in progress).
+- Migration 007 kept every existing record and picture: old driver shift text became Morning/Afternoon ("Relief
+  Driver" became "not on a shift"), active crew filled Morning then Afternoon by date added, and anyone over the limit
+  was moved to **Not on a shift** instead of being deleted. Settings is not in the sidebar: the top-right picture/initials and the bottom-left profile open it.
 The admin sign-in page uses two columns (branding and form) and stacks on phones.
 
 ### Pictures and photos

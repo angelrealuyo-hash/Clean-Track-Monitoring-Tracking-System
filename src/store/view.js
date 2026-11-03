@@ -50,10 +50,12 @@ export function viewFor(state, user) {
       runs: state.runs,
       collectionFeedback: [],
       driverIssues: (state.driverIssues ?? []).filter((x) => x.driverId === user.refId),
-      // Only the crew working on this driver's truck (view only).
+      // Only the active crew on this driver's truck and shift (view only).
       crew:
         state.truck.driverId === user.refId
-          ? (state.crew ?? []).filter((c) => c.truckId === state.truck.id && c.status === 'active').map(({ id, name, role, photo }) => ({ id, name, role, photo: photo ?? null }))
+          ? (state.crew ?? [])
+              .filter((c) => c.truckId === state.truck.id && c.status === 'active' && c.shift === state.drivers.find((d) => d.id === user.refId)?.shift)
+              .map(({ id, name, role, photo }) => ({ id, name, role, photo: photo ?? null }))
           : [],
       notifications: withReadState(state.notifications.filter((n) => n.audience === 'driver'), key),
       residents: [],

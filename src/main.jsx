@@ -8,6 +8,10 @@ import DataProvider from './store/DataProvider.jsx'
 import ConnectedTrackingProvider from './tracking/ConnectedTrackingProvider.jsx'
 import ToastProvider from './components/toast/ToastProvider.jsx'
 import App from './App.jsx'
+import { startResponsiveTables } from './utils/responsiveTables.js'
+
+// Phones: data tables show as stacked cards (labels come from the headings).
+startResponsiveTables()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

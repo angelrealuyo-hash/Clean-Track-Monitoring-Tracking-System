@@ -62,3 +62,48 @@
   object-fit: cover;
   border-radius: 6px;
 }
+
+/* Compact search box with a Clear button beside it */
+.collection-search {
+  display: flex;
+  flex: 0 1 300px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ct-toolbar .collection-search .ct-input-group {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The Clear button replaces the browser's own small "x" */
+.collection-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.collection-toolbar select.ct-input {
+  min-width: 140px;
+}
+
+.collection-search__clear {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.collection-search__clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+  .collection-search {
+    flex-basis: 100%;
+  }
+
+  .collection-toolbar select.ct-input {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+}

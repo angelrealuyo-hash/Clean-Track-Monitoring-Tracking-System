@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleX, Info, MapPin, SkipForward, Truck } from 'lucide-react'
+import { ArrowRight, BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleX, Info, Lock, MapPin, SkipForward, Truck } from 'lucide-react'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import ToggleRow from '../../components/ToggleRow.jsx'
 import { useData } from '../../store/dataContext.js'
@@ -9,6 +9,7 @@ import { barangay } from '../../data/barangay.js'
 import { dayOfDate, exceptionKinds, scheduleLabel } from '../../data/schedule.js'
 import { calendarLegend, dayStatus } from '../../data/calendarStatus.js'
 import { feedbackReasonLabel } from '../../data/collectionFeedback.js'
+import { holidayTypes, holidaysListedFor } from '../data/phHolidays.js'
 import { formatDate, localDateISO, todayISO } from '../../utils/format.js'
 import './ResidentPages.css'
 
@@ -16,6 +17,9 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const ICONS = { scheduled: Truck, done: CircleCheck, skipped: SkipForward, missed: CircleX, holiday: CircleAlert }
 const TONES = { scheduled: 'green', done: 'green', skipped: 'gray', missed: 'red', holiday: 'amber' }
 const LEGEND_ORDER = ['scheduled', 'done', 'skipped', 'missed', 'holiday']
+
+// Past dates and completed pickups are shown muted and cannot be selected.
+const isLocked = (date, st, today) => date < today || st?.status === 'done'
 
 const iso = (y, m, d) => localDateISO(new Date(y, m, d))
 const monthName = (y, m) => new Date(y, m, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
@@ -100,15 +104,20 @@ export default function SchedulePage() {
             if (!d) return <span key={`b${i}`} aria-hidden="true" />
             const st = dayStatus(d, ctx)
             const Icon = st ? ICONS[st.status] : null
-            const label = `${formatDate(d)}${d === today ? ' (today)' : ''}: ${st ? calendarLegend[st.status] : 'No pickup'}`
+            const what = st?.status === 'holiday' ? `${st.official?.name ?? st.exception.reason}, no pickup` : st ? calendarLegend[st.status] : 'No pickup'
+            // Days that have passed and completed pickups cannot be chosen.
+            const locked = isLocked(d, st, today)
+            const label = `${formatDate(d)}${d === today ? ' (today)' : ''}: ${what}${locked ? (st?.status === 'done' ? ' (completed)' : ' (past)') : ''}`
             return (
               <button
                 key={d}
                 type="button"
                 role="gridcell"
-                className={`res-cal__day ${st ? `is-${st.status}` : 'is-none'} ${d === today ? 'is-today' : ''} ${d === selected ? 'is-selected' : ''}`}
+                className={`res-cal__day ${st ? `is-${st.status}` : 'is-none'} ${d === today ? 'is-today' : ''} ${d === selected ? 'is-selected' : ''} ${locked ? 'is-locked' : ''}`}
                 aria-label={label}
                 aria-selected={d === selected}
+                aria-disabled={locked}
+                disabled={locked}
                 title={label}
                 onClick={() => setSelected(d)}
               >
@@ -128,7 +137,15 @@ export default function SchedulePage() {
               </li>
             )
           })}
+          <li className="is-locked">
+            <Lock size={14} aria-hidden="true" /> Past or completed (cannot be selected)
+          </li>
         </ul>
+        {!holidaysListedFor(view.y) && (
+          <p className="m-muted res-cal__note">
+            Official holidays for {view.y} are not listed yet. They will appear once the government proclamation for {view.y} is added.
+          </p>
+        )}
       </section>
 
       {/* The chosen date */}
@@ -147,9 +164,27 @@ export default function SchedulePage() {
               <StatusBadge tone={TONES[sel.status]}>{calendarLegend[sel.status]}</StatusBadge>
             </p>
             {sel.status === 'holiday' ? (
-              <p className="m-muted">
-                {exceptionKinds[sel.exception.kind]}: {sel.exception.reason}. The truck does not come on this day.
-              </p>
+              <div className="res-holiday">
+                {sel.official && (
+                  <p>
+                    <strong>{sel.official.name}</strong>
+                    <span className="m-muted">
+                      {' '}
+                      · {holidayTypes[sel.official.type]} ({sel.official.proclamation})
+                    </span>
+                  </p>
+                )}
+                {sel.exception && (
+                  <p className="m-muted">
+                    {exceptionKinds[sel.exception.kind]}: {sel.exception.reason}.
+                  </p>
+                )}
+                <p className="m-muted">
+                  {sel.collectionDay
+                    ? 'No garbage pickup on this day. Regular pickup is not moved to another day; keep your garbage for the next pickup day.'
+                    : `No pickup on this day (pickup days are ${scheduleLabel}).`}
+                </p>
+              </div>
             ) : (
               <p className="m-muted">
                 <Truck size={11} /> Truck {data.truck.id} · pickup {pickupWindow}

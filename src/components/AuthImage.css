@@ -89,6 +89,42 @@
   cursor: pointer;
 }
 
+/* Change Picture / Remove: same height, padding and font size */
+.ct-avatar-picker__buttons {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ct-avatar-picker__btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ct-avatar-picker__btn > svg {
+  flex-shrink: 0;
+}
+
+.ct-avatar-picker__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Narrow cards (phones): the two buttons share the row equally */
+@media (max-width: 480px) {
+  .ct-avatar-picker__btn {
+    flex: 1 1 auto;
+    gap: 6px;
+    padding: 0 12px;
+  }
+}
+
 .ct-avatar-picker label.ct-btn:focus-within {
   outline: 2px solid var(--ct-green-700);
   outline-offset: 2px;

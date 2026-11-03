@@ -2,10 +2,13 @@ import { useState } from 'react'
 import { UserPlus } from 'lucide-react'
 import Modal from '../../../components/Modal.jsx'
 import { driverStatusMeta } from '../../../store/selectors.js'
+import { shiftLabel } from '../../../data/personnel.js'
 
-// PDF page 15 (Assign Driver)
-export default function AssignDriverModal({ truck, drivers, onSave, onClose }) {
+// PDF page 15 (Assign Driver). Only active drivers on one of the truck's
+// shifts can drive it (see Collector's Management).
+export default function AssignDriverModal({ truck, drivers: allDrivers, onSave, onClose }) {
   const [driverId, setDriverId] = useState(truck.driverId ?? '')
+  const drivers = allDrivers.filter((d) => d.active !== false && d.truckId === truck.id && d.shift)
 
   return (
     <Modal
@@ -24,7 +27,7 @@ export default function AssignDriverModal({ truck, drivers, onSave, onClose }) {
       }
     >
       <p>
-        Select an authorized barangay driver for <strong>{truck.id}</strong>.
+        Select the driver on duty for <strong>{truck.id}</strong>. Only active Morning and Afternoon Shift drivers are listed.
       </p>
       <div className="ct-options" role="radiogroup" aria-label="Driver">
         {drivers.map((d) => (
@@ -34,7 +37,7 @@ export default function AssignDriverModal({ truck, drivers, onSave, onClose }) {
             <span>
               <strong>{d.name}</strong>
               <small>
-                {d.shift} · {driverStatusMeta[d.status].label}
+                {shiftLabel(d.shift)} · {driverStatusMeta[d.status].label}
               </small>
             </span>
           </label>

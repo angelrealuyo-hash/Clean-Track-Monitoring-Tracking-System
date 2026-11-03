@@ -234,12 +234,12 @@ test('API: crew members are managed by the admin only and saved', async () => {
   assert.equal((await send(drv, 'crew/add', { name: 'Ben Reyes', role: 'Garbage Collector' })).status, 403)
   assert.equal((await send(adm, 'crew/add', { name: 'Ben Reyes', role: 'Astronaut' })).status, 400)
   assert.equal((await send(adm, 'crew/add', { name: 'Ben Reyes', role: 'Garbage Collector', phone: 'abc' })).status, 400)
-  const added = await send(adm, 'crew/add', { name: 'Ben  Reyes', role: 'Garbage Collector', truckId: 'TRK-01' })
+  const added = await send(adm, 'crew/add', { name: 'Ben  Reyes', role: 'Garbage Collector', shift: 'morning' })
   assert.equal(added.status, 200)
   const ben = added.json.data.crew[0]
-  assert.deepEqual([ben.name, ben.truckId, ben.status, ben.phone], ['Ben Reyes', 'TRK-01', 'active', ''])
+  assert.deepEqual([ben.name, ben.truckId, ben.shift, ben.status, ben.phone], ['Ben Reyes', 'TRK-01', 'morning', 'active', ''])
   const driversBefore = JSON.stringify(added.json.data.drivers)
-  const upd = await send(adm, 'crew/update', { id: ben.id, patch: { ...ben, role: 'Crew Leader', status: 'inactive', truckId: null, phone: '0917 555 0100' } })
+  const upd = await send(adm, 'crew/update', { id: ben.id, patch: { ...ben, role: 'Crew Leader', status: 'inactive', shift: null, phone: '0917 555 0100' } })
   const c = upd.json.data.crew[0]
   assert.deepEqual([c.role, c.status, c.truckId], ['Crew Leader', 'inactive', null])
   assert.equal(JSON.stringify(upd.json.data.drivers), driversBefore, 'driver records untouched')
@@ -323,16 +323,16 @@ test('API: profile pictures belong to the right person; replaced pictures are re
   const d = (await send(adm, 'driver/update', { id: 'DRV-01', patch: { photo: PNG } })).json.data.drivers.find((x) => x.id === 'DRV-01')
   assert.match(d.photo, /^upl:/)
   assert.equal((await send(drv, 'driver/update', { id: 'DRV-01', patch: { photo: PNG } })).status, 403, 'drivers cannot change pictures')
-  const crewRes = await send(adm, 'crew/add', { name: 'Lito Ramos', role: 'Garbage Collector', truckId: 'TRK-01', photo: PNG })
+  const crewRes = await send(adm, 'crew/add', { name: 'Lito Ramos', role: 'Garbage Collector', shift: 'morning', photo: PNG })
   const lito = crewRes.json.data.crew.find((c) => c.name === 'Lito Ramos')
-  await send(adm, 'crew/add', { name: 'Joy Dizon', role: 'Helper / Loader', truckId: 'TRK-01' })
-  await send(adm, 'crew/add', { name: 'Off Truck', role: 'Helper / Loader', truckId: null })
+  await send(adm, 'crew/add', { name: 'Joy Dizon', role: 'Helper / Loader', shift: 'morning' })
+  await send(adm, 'crew/add', { name: 'Other Shift', role: 'Helper / Loader', shift: 'afternoon' })
   const after = (await send(adm, 'crew/update', { id: lito.id, patch: { ...lito, photo: null } })).json.data
   assert.equal(after.crew.find((c) => c.id === lito.id).photo, null)
   assert.equal(after.drivers.find((x) => x.id === 'DRV-01').photo, d.photo, 'driver picture unchanged')
   assert.equal((await getImage(lito.photo, adm)).status, 404, 'removed picture deleted')
 
-  // Driver sees only the active crew of their own truck, with pictures.
+  // Driver sees only the active crew of their own truck and shift, with pictures.
   await send(adm, 'crew/update', { id: lito.id, patch: { ...lito, photo: PNG } })
   const driverCrew = (await call('/state', { token: drv })).json.data.crew
   assert.deepEqual(driverCrew.map((c) => c.name).sort(), ['Joy Dizon', 'Lito Ramos'])

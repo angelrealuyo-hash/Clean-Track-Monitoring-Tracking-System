@@ -90,7 +90,7 @@ export default function ReportsAnalyticsPage() {
       <PageHeader
         title="Reports & Analytics"
         badge="From saved records"
-        subtitle="Collection results and resident feedback for the barangay"
+        subtitle="Collection results and resident feedback"
         actions={
           <button type="button" className="ct-btn ct-btn--primary" onClick={exportCsv} disabled={history.length === 0}>
             <Download size={16} /> Export CSV Report
@@ -98,13 +98,11 @@ export default function ReportsAnalyticsPage() {
         }
       />
 
-      <div className="ct-alert">
+      <div className="ct-alert analytics-source">
         <Info size={16} />
         <span>
-          Built from <strong>{runs.length}</strong> saved collection run{runs.length === 1 ? '' : 's'} and{' '}
-          <strong>{reports.length}</strong> resident reports saved in the CleanTrack database, plus{' '}
-          <strong>{(data.collectionFeedback ?? []).length}</strong> resident pickup answers (see Resident Collection Participation below). A run is saved each time the driver taps Start
-          Route. Truck positions are simulated; stop results are what the driver or office recorded.
+          Source: <strong>{runs.length}</strong> run{runs.length === 1 ? '' : 's'} · <strong>{reports.length}</strong> report{reports.length === 1 ? '' : 's'} ·{' '}
+          <strong>{(data.collectionFeedback ?? []).length}</strong> resident answers · truck GPS simulated
         </span>
       </div>
 
@@ -119,7 +117,7 @@ export default function ReportsAnalyticsPage() {
           <span>Across {runs.length} run(s)</span>
         </StatCard>
         <StatCard label="Missed Pickups" icon={TriangleAlert} value={totalMissed} unit="missed" tone="amber">
-          <span>Reported by driver or office</span>
+          <span>Driver or office records</span>
         </StatCard>
         <StatCard label="Resident Reports" icon={ClipboardList} value={reports.length} unit="reports">
           <span>
@@ -133,14 +131,14 @@ export default function ReportsAnalyticsPage() {
           <div className="ct-card__header">
             <div>
               <h2>Completion per Run</h2>
-              <p>Last {trend.length || 0} collection run(s), % of pickup points collected</p>
+              <p>Last {trend.length || 0} run(s) · % collected</p>
             </div>
           </div>
           <div className="ct-card__body">
             {trend.length ? (
               <BarList items={trend} unit="%" max={100} label="Completion per run" />
             ) : (
-              <p className="ct-empty">No collection runs yet. Start a route in the Driver app to record one.</p>
+              <p className="ct-empty">No collection runs yet.</p>
             )}
           </div>
         </article>
@@ -164,7 +162,7 @@ export default function ReportsAnalyticsPage() {
         <div className="ct-card__header">
           <div>
             <h2>Current Run: Pickup Point Status</h2>
-            <p>{today.total} pickup points on {route.shortName}</p>
+            <p>{today.total} pickup points</p>
           </div>
         </div>
         <div className="ct-card__body">
@@ -187,7 +185,7 @@ export default function ReportsAnalyticsPage() {
             <h2>
               <History size={16} /> Collection Run History
             </h2>
-            <p>Every saved run, newest first</p>
+            <p>Newest first</p>
           </div>
         </div>
         <div className="ct-card__body">
@@ -242,7 +240,7 @@ export default function ReportsAnalyticsPage() {
         <div className="ct-card__header">
           <div>
             <h2>Results by Purok</h2>
-            <p>All saved runs combined</p>
+            <p>All runs combined</p>
           </div>
         </div>
         <div className="ct-card__body">
@@ -256,7 +254,7 @@ export default function ReportsAnalyticsPage() {
                     <th>Purok</th>
                     <th className="is-right">Collected</th>
                     <th className="is-right">Missed</th>
-                    <th className="is-right">Not done (run ended)</th>
+                    <th className="is-right">Not done</th>
                     <th className="is-right">Resident reports</th>
                   </tr>
                 </thead>
@@ -276,9 +274,6 @@ export default function ReportsAnalyticsPage() {
               </table>
             </div>
           )}
-        </div>
-        <div className="ct-table__foot">
-          <span>Reports are matched to a purok by the location the resident entered.</span>
         </div>
       </article>
 

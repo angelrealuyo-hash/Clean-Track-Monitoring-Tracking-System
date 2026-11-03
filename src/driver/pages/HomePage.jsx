@@ -10,6 +10,7 @@ import { scheduleLabel } from '../../data/schedule.js'
 import MyCrewCard from '../components/MyCrewCard.jsx'
 import Avatar from '../../components/Avatar.jsx'
 import './DriverPages.css'
+import { shiftWithHours } from '../../data/personnel.js'
 
 // Driver Home: greeting, Start Route, Today's Progress, Report a Problem, Call the Office.
 export default function HomePage() {
@@ -40,7 +41,7 @@ export default function HomePage() {
             <p className="m-muted">
               {driver.name} · <span className="ct-mono">{driver.id}</span>
             </p>
-            {driver.shift && <p className="m-muted">{driver.shift}</p>}
+            {driver.shift && <p className="m-muted">{shiftWithHours(driver.shift)}</p>}
           </div>
         </div>
         <div className="m-box-grid drv-gap">

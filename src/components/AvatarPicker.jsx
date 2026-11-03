@@ -35,15 +35,17 @@ export default function AvatarPicker({ value, onChange, initials, name, busy = f
     <div className="ct-avatar-picker">
       <Avatar photo={value} initials={initials} name={name} className="ct-avatar" style={{ width: size, height: size, fontSize: size / 3 }} />
       <div className="ct-avatar-picker__actions">
-        <label htmlFor={id} className={`ct-btn ct-btn--secondary ${disabled ? 'is-disabled' : ''}`} aria-disabled={disabled}>
-          <Camera size={15} /> {working ? 'Preparing…' : value ? 'Change Picture' : 'Upload Picture'}
-          <input id={id} type="file" accept={ACCEPT.join(',')} onChange={pick} disabled={disabled} className="ct-sr-only" />
-        </label>
-        {value && (
-          <button type="button" className="ct-btn ct-btn--secondary" onClick={() => onChange(null)} disabled={disabled}>
-            <Trash2 size={15} /> Remove
-          </button>
-        )}
+        <div className="ct-avatar-picker__buttons">
+          <label htmlFor={id} className={`ct-btn ct-btn--secondary ct-avatar-picker__btn ${disabled ? 'is-disabled' : ''}`} aria-disabled={disabled}>
+            <Camera size={15} /> {working ? 'Preparing…' : value ? 'Change Picture' : 'Upload Picture'}
+            <input id={id} type="file" accept={ACCEPT.join(',')} onChange={pick} disabled={disabled} className="ct-sr-only" />
+          </label>
+          {value && (
+            <button type="button" className="ct-btn ct-btn--secondary ct-avatar-picker__btn" onClick={() => onChange(null)} disabled={disabled}>
+              <Trash2 size={15} /> Remove
+            </button>
+          )}
+        </div>
         <small className="ct-field__hint">JPG, PNG or WebP, up to 10 MB.</small>
         {error && (
           <span className="ct-field__error" role="alert">

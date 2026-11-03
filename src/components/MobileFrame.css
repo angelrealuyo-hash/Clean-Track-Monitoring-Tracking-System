@@ -15,8 +15,26 @@
   background: var(--ct-green-50);
 }
 
-/* On larger screens, show the app as a phone in the middle of the page. */
-@media (min-width: 520px) {
+/* Tablets: the app fills the screen; content keeps a readable width. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .mobile-frame {
+    max-width: none;
+  }
+
+  .mobile-frame .m-page,
+  .mobile-frame .m-auth > * {
+    width: 100%;
+    max-width: 680px;
+    margin-inline: auto;
+  }
+
+  .mobile-frame .mobile-tabs {
+    padding-inline: max(8px, calc((100% - 680px) / 2));
+  }
+}
+
+/* Laptops and desktops: show the app as a phone in the middle of the page. */
+@media (min-width: 1024px) {
   .mobile-stage {
     align-items: center;
     padding: 24px 16px;

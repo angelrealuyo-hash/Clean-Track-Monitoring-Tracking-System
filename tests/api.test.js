@@ -139,7 +139,7 @@ test('emails are logged honestly when SMTP is not configured; duplicates prevent
 
 test('driver account can be disabled', async () => {
   const adm = await login('admin', 'admin@cleantrack.gov', 'SuperAdmin#2025')
-  const add = await act(adm, 'driver/add', { name: 'Juan Dela Cruz', phone: '0918 222 3333', license: 'Class 2', shift: 'Relief Driver', status: 'standby', email: 'juan@example.com', password: 'juan123' })
+  const add = await act(adm, 'driver/add', { name: 'Juan Dela Cruz', phone: '0918 222 3333', license: 'Class 2', shift: 'afternoon', active: false, status: 'standby', email: 'juan@example.com', password: 'juan123' })
   assert.equal(add.status, 200)
   const juan = add.json.data.drivers.find((d) => d.name === 'Juan Dela Cruz')
   assert.equal(juan.account, 'active')

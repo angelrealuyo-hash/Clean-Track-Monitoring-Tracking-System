@@ -12,6 +12,8 @@ import { COLLECTION, exceptionKinds, exceptionOn, isCollectionDate, isCollection
 import { barangay } from '../src/data/barangay.js'
 import { feedbackReasons } from '../src/data/collectionFeedback.js'
 import { crewRoles } from '../src/data/crew.js'
+import { phHolidayOn } from '../src/resident/data/phHolidays.js'
+import { SHIFT_KEYS, collectorsOf, fullMessage, hasRoom, holdsSlot, sameName } from '../src/data/personnel.js'
 import { todayISO, todayName } from '../src/utils/format.js'
 
 export class HttpError extends Error {
@@ -97,6 +99,37 @@ const ROLE_ACTIONS = {
 
 const runActive = (state) => Boolean(state.activeRunId)
 
+const bool = (v, label) => {
+  if (typeof v !== 'boolean') fail(`${label} must be Active or Inactive.`)
+  return v
+}
+
+// ---------- Truck personnel (limits in src/data/personnel.js) ----------
+// Works out a person's roster place { truckId, shift } and checks the shift
+// limit whenever they would take a slot they do not already hold. Editing a
+// name, number or picture never re-checks the limit, and the person's own
+// current slot is left out of the count. Inactive people take no slot.
+function rosterPlace(state, { type, key, current, shiftIn, active, required }) {
+  let shift
+  if (shiftIn === undefined) {
+    if (required) fail('Choose the Morning or Afternoon shift.')
+    shift = current?.shift ?? null
+  } else if (shiftIn === null || shiftIn === '') {
+    if (required) fail('Choose the Morning or Afternoon shift.')
+    shift = null
+  } else shift = oneOf(shiftIn, SHIFT_KEYS, 'Shift')
+  const place = { truckId: shift ? state.truck.id : null, shift }
+  const takesSlot = holdsSlot({ ...place, active }, state.truck.id)
+  const keepsSameSlot = current && holdsSlot(current, state.truck.id) && current.shift === shift
+  if (takesSlot && !keepsSameSlot && !hasRoom(state, type, shift, { excludeKey: key })) fail(fullMessage(type, shift), 409)
+  return place
+}
+
+// The same person may not be listed twice (e.g. a form sent twice).
+function checkNotListed(state, name, key) {
+  if (collectorsOf(state).some((c) => c.key !== key && sameName(c.name, name))) fail(`${name} is already on the collectors list.`, 409)
+}
+
 /**
  * @returns {{ action: object, effects: object[] }}
  */
@@ -131,8 +164,11 @@ export function prepareAction(state, user, action) {
     }
     case 'truck/assignDriver': {
       const driverId = p.driverId ?? null
-      if (driverId !== null && !state.drivers.some((d) => d.id === driverId)) fail('That driver does not exist.')
+      const driver = driverId === null ? null : collectorsOf(state).find((c) => c.key === `driver:${driverId}`)
+      if (driverId !== null && !driver) fail('That driver does not exist.')
       if (runActive(state) && driverId !== state.truck.driverId) fail('A route is in progress. End it before changing the driver.', 409)
+      if (driver && !holdsSlot(driver, state.truck.id))
+        fail(`${driver.name} is not an active ${state.truck.id} driver. Put them on the Morning or Afternoon shift first (Collector's Management).`, 409)
       return out({ driverId })
     }
     case 'truck/logMaintenance': {
@@ -156,11 +192,15 @@ export function prepareAction(state, user, action) {
     // ---------- Drivers ----------
     case 'driver/add': {
       const e = email(p.email, 'Driver email')
+      const name = str(p.name, 'Driver name', { min: 3, max: 60 }).replace(/\s+/g, ' ')
+      checkNotListed(state, name, null)
+      const active = p.active === undefined ? true : bool(p.active, 'Status')
       const driver = {
-        name: str(p.name, 'Driver name', { min: 3, max: 60 }).replace(/\s+/g, ' '),
+        name,
         phone: phone(p.phone),
         license: str(p.license, 'License type', { max: 60 }),
-        shift: str(p.shift, 'Shift', { max: 60 }),
+        ...rosterPlace(state, { type: 'driver', key: null, current: null, shiftIn: p.shift, active, required: true }),
+        active,
         status: oneOf(p.status ?? 'standby', ['on-shift', 'standby', 'off-duty'], 'Availability'),
         ...(e ? { email: e } : {}),
         photo: profilePhoto(p.photo, null) ?? null,
@@ -183,10 +223,21 @@ export function prepareAction(state, user, action) {
         if (keys.some((k) => k !== 'status')) fail('You can only change your shift status.', 403)
       }
       const patch = {}
-      if ('name' in patchIn) patch.name = str(patchIn.name, 'Driver name', { min: 3, max: 60 }).replace(/\s+/g, ' ')
+      const key = `driver:${p.id}`
+      if ('name' in patchIn) {
+        patch.name = str(patchIn.name, 'Driver name', { min: 3, max: 60 }).replace(/\s+/g, ' ')
+        if (!sameName(patch.name, target.name)) checkNotListed(state, patch.name, key)
+      }
       if ('phone' in patchIn) patch.phone = phone(patchIn.phone)
       if ('license' in patchIn) patch.license = str(patchIn.license, 'License type', { max: 60 })
-      if ('shift' in patchIn) patch.shift = str(patchIn.shift, 'Shift', { max: 60 })
+      if ('shift' in patchIn || 'active' in patchIn) {
+        const current = collectorsOf(state).find((c) => c.key === key)
+        const active = 'active' in patchIn ? bool(patchIn.active, 'Status') : current.active
+        Object.assign(patch, rosterPlace(state, { type: 'driver', key, current, shiftIn: patchIn.shift, active }), { active })
+        // The driver on duty leaves the truck: only when no route is running.
+        if (state.truck.driverId === p.id && !holdsSlot(patch, state.truck.id) && runActive(state))
+          fail('This driver has a route in progress. End the route first.', 409)
+      }
       if ('photo' in patchIn) patch.photo = profilePhoto(patchIn.photo, target.photo ?? null)
       if ('email' in patchIn) {
         const e = email(patchIn.email, 'Driver email')
@@ -364,14 +415,18 @@ export function prepareAction(state, user, action) {
       const current = editing ? (state.crew ?? []).find((c) => c.id === p.id) : null
       if (editing && !current) fail('That crew member does not exist.', 404)
       const f = editing ? (p.patch ?? {}) : p
-      const truckId = f.truckId || null
-      if (truckId && truckId !== state.truck.id) fail('That truck does not exist.')
+      const key = editing ? `crew:${p.id}` : null
+      const name = str(f.name, 'Name', { min: 3, max: 60 }).replace(/\s+/g, ' ')
+      if (!editing || !sameName(name, current.name)) checkNotListed(state, name, key)
+      const status = oneOf(f.status ?? (editing ? current.status : 'active'), ['active', 'inactive'], 'Status')
+      const was = editing ? collectorsOf(state).find((c) => c.key === key) : null
       const member = {
-        name: str(f.name, 'Name', { min: 3, max: 60 }).replace(/\s+/g, ' '),
-        role: oneOf(f.role, crewRoles, 'Role'),
+        name,
+        // Position on the crew (Garbage Collector, Helper / Loader, ...).
+        role: oneOf(f.role ?? (editing ? current.role : crewRoles[0]), crewRoles, 'Position'),
         phone: f.phone && String(f.phone).trim() ? phone(f.phone) : '',
-        truckId,
-        status: oneOf(f.status ?? 'active', ['active', 'inactive'], 'Status'),
+        ...rosterPlace(state, { type: 'crew', key, current: was, shiftIn: f.shift, active: status === 'active', required: !editing }),
+        status,
         ...('photo' in f ? { photo: profilePhoto(f.photo, current?.photo ?? null) } : editing ? {} : { photo: null }),
       }
       return out(editing ? { id: p.id, patch: member } : member)
@@ -389,6 +444,7 @@ export function prepareAction(state, user, action) {
       // Answers are always for TODAY, and only on an official collection day.
       if (!isCollectionDay(todayName())) fail(`There is no garbage pickup today (pickup days: ${scheduleLabel}).`, 409)
       if (!isPickupDate(todayISO(), state.scheduleExceptions)) fail('There is no garbage pickup today (holiday or suspension).', 409)
+      if (phHolidayOn(todayISO())) fail(`There is no garbage pickup today (${phHolidayOn(todayISO()).name}).`, 409)
       const yesNo = (v, label) => {
         if (v === null || v === undefined) return null
         if (typeof v !== 'boolean') fail(`${label} must be Yes or No.`)

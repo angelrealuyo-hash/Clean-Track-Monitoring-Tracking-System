@@ -98,15 +98,18 @@
 
 .ct-checkbox {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: 13px;
+  line-height: 18px;
   cursor: pointer;
 }
 
 .ct-checkbox input {
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
+  margin: 1px 0 0;
   accent-color: var(--ct-green-900);
 }
 
@@ -230,6 +233,12 @@ textarea.ct-input {
 
 select.ct-input {
   cursor: pointer;
+}
+
+.ct-field__aside {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ct-text-muted);
 }
 
 .ct-field__hint {
@@ -403,4 +412,21 @@ select.ct-input {
 .ct-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.ct-input-group:has(input[aria-invalid='true']) {
+  border-color: var(--ct-red-600);
+}
+
+/* Password show/hide (eye) button inside an input group */
+.ct-pw-toggle {
+  flex-shrink: 0;
+  margin-right: -6px;
+}
+
+/* Hide the browser's own password eye (Microsoft Edge) so only the
+   CleanTrack show/hide button appears in password fields. */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
 }

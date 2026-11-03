@@ -10,6 +10,7 @@ import { useDriverRoute } from '../components/useDriverRoute.js'
 import { driverStatusMeta, truckStatusMeta } from '../../store/selectors.js'
 import { barangay } from '../../data/barangay.js'
 import './DriverPages.css'
+import { shiftWithHours } from '../../data/personnel.js'
 
 const tel = (n) => `tel:${n.replace(/[^\d+]/g, '')}`
 
@@ -79,7 +80,7 @@ export default function ProfilePage() {
       <section className="m-card">
         <div className="m-row m-row--between">
           <strong>My Work Today</strong>
-          <span className="m-muted">{driver.shift}</span>
+          <span className="m-muted">{shiftWithHours(driver.shift)}</span>
         </div>
         <div className="m-box-grid drv-gap">
           <div className="m-box">

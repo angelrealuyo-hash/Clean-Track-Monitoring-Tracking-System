@@ -56,9 +56,11 @@ export default function DriverIssueForm({ stops, stopId = '', driverName, saving
         </div>
       </header>
 
-      <label className="ct-field">
-        <span className="ct-label">Where?</span>
-        <select className="ct-input" value={form.stopId} onChange={set('stopId')}>
+      <div className="ct-field m-field-flat">
+        <label className="ct-label" htmlFor="di-stop">
+          Where?
+        </label>
+        <select id="di-stop" className="ct-input" value={form.stopId} onChange={set('stopId')}>
           <option value="">Not at a stop (on the road, truck, depot)</option>
           {stops.map((s) => (
             <option key={s.stop.id} value={s.stop.id}>
@@ -66,7 +68,7 @@ export default function DriverIssueForm({ stops, stopId = '', driverName, saving
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
       <div className="m-row m-row--between">
         <h2 className="m-section-title">Choose one</h2>
@@ -88,8 +90,8 @@ export default function DriverIssueForm({ stops, stopId = '', driverName, saving
         })}
       </div>
 
-      <section className="m-card">
-        <Field label="What happened?" htmlFor="di-desc" required error={error} hint={`${form.description.length}/250`}>
+      <section className="m-card m-form">
+        <Field label="What happened?" htmlFor="di-desc" required error={error} aside={`${form.description.length}/250`}>
           <textarea
             id="di-desc"
             className="ct-input"
