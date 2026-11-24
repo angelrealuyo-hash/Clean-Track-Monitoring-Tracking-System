@@ -370,15 +370,16 @@ test('API: a stop recorded by the office on a non-collection day is a special ru
   }
 })
 
-test('API: holidays / suspensions cancel the pickup everywhere and are saved', async () => {
+test('API: suspensions cancel the pickup everywhere and are saved', async () => {
   const adm = await login('admin', 'admin@cleantrack.gov', 'SuperAdmin#2025')
   const res = await login('resident', 'maria.santos@email.com', 'resident123')
   const drv = await login('driver', 'driver.ortiz@cleantrack.ph', 'driver123')
   const today = todayISO() // Wednesday 2026-10-28 (pinned)
-  assert.equal((await send(res, 'schedule/addException', { date: today, kind: 'holiday', reason: 'Test' })).status, 403)
-  assert.equal((await send(adm, 'schedule/addException', { date: '2026-10-27', kind: 'holiday', reason: 'Tuesday' })).status, 400, 'not a pickup day')
-  assert.equal((await send(adm, 'schedule/addException', { date: '2026-10-26', kind: 'holiday', reason: 'Past' })).status, 400, 'past date')
+  assert.equal((await send(res, 'schedule/addException', { date: today, kind: 'suspended', reason: 'Test' })).status, 403)
+  assert.equal((await send(adm, 'schedule/addException', { date: '2026-10-27', kind: 'suspended', reason: 'Tuesday' })).status, 400, 'not a pickup day')
+  assert.equal((await send(adm, 'schedule/addException', { date: '2026-10-26', kind: 'suspended', reason: 'Past' })).status, 400, 'past date')
   assert.equal((await send(adm, 'schedule/addException', { date: today, kind: 'party', reason: 'Nope' })).status, 400)
+  assert.equal((await send(adm, 'schedule/addException', { date: today, kind: 'holiday', reason: 'Fiesta' })).status, 400, 'Holiday type was removed')
 
   const added = await send(adm, 'schedule/addException', { date: today, kind: 'suspended', reason: 'Truck under repair' })
   assert.equal(added.status, 200)

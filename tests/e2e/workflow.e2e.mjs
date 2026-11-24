@@ -454,23 +454,26 @@ try {
     check('P2 Reset returns the truck to the depot', await seen(a.getByRole('button', { name: 'Start Simulation' })))
   })
 
-  await step('Holiday / suspension and the resident calendar', async () => {
+  await step('Suspension and the resident calendar', async () => {
     // Next collection day after today (Mon/Wed/Fri).
     const next = new Date()
     do next.setDate(next.getDate() + 1)
     while (![1, 3, 5].includes(next.getDay()))
     const iso = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
     await nav('Routes & Schedules')
-    await a.fill('#ex-date', iso)
-    await a.selectOption('#ex-kind', 'holiday')
-    await a.fill('#ex-reason', 'Test holiday')
+    await a.click('#ex-date')
+    check('H0 Opening the calendar shows no error', !(await a.locator('.exceptions-form .ct-field__error').count()))
+    while (!(await a.locator(`.ct-datepicker [data-iso="${iso}"]`).count())) await a.getByRole('button', { name: 'Next month' }).click()
+    await a.click(`.ct-datepicker [data-iso="${iso}"]`)
+    check('H0b Type offers Suspension only', JSON.stringify(await a.locator('#ex-kind option').allTextContents()) === '["Suspension"]')
+    await a.fill('#ex-reason', 'Test suspension')
     await a.getByRole('button', { name: 'Add', exact: true }).click()
-    check('H1 Admin adds a holiday (saved)', (await seen(a.locator('.exceptions-list').getByText('Test holiday'))) && (await serverState()).scheduleExceptions.some((x) => x.date === iso))
+    check('H1 Admin adds a suspension (saved)', (await seen(a.locator('.exceptions-list').getByText('Test suspension'))) && (await serverState()).scheduleExceptions.some((x) => x.date === iso))
     await r.goto(`${B}/resident/schedule`)
     await r.locator('.res-cal').waitFor()
     if (next.getMonth() !== new Date().getMonth()) await r.getByRole('button', { name: 'Next month' }).click()
     const cell = r.locator('.res-cal__day', { has: r.locator(`text="${next.getDate()}"`) }).first()
-    check('H2 Calendar: exclamation icon on the holiday (not the truck)', (await cell.getAttribute('class')).includes('is-holiday'))
+    check('H2 Calendar: exclamation icon on the suspended day (not the truck)', (await cell.getAttribute('class')).includes('is-holiday'))
     check('H3 Calendar: X today for "could not dispose" (Maria)', (await r.goto(`${B}/resident/schedule`)) && (await seen(r.locator('.res-cal__day.is-today.is-missed'))))
     const legend = await r.locator('.res-cal__legend').innerText()
     check('H4 Legend explains all five icons', ['Pickup day', 'disposed', 'skipped', 'Not completed', 'Holiday'].every((t) => legend.includes(t)))

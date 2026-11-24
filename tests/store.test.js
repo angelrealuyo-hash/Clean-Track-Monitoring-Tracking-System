@@ -82,7 +82,7 @@ test('resident calendar status follows the saved records', async () => {
   // 2026-10-26 Mon, 27 Tue, 28 Wed (today), 30 Fri, 2026-11-02 Mon
   const ctx = {
     today: '2026-10-28',
-    exceptions: [{ date: '2026-11-02', kind: 'holiday', reason: 'All Souls' }],
+    exceptions: [{ date: '2026-11-02', kind: 'suspended', reason: 'All Souls' }],
     feedback: [
       { date: '2026-10-21', willDispose: true, truckPassed: true, disposed: true },
       { date: '2026-10-19', willDispose: false, truckPassed: null, disposed: null },

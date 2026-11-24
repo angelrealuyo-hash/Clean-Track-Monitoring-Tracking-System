@@ -98,8 +98,8 @@ apps and the server). Admins can change the pickup time of those days, not the d
 cannot start a regular route and residents get no pickup reminder or Pick Up Check; a stop the office records on
 another day is saved as a **special** run. Residents are not asked to sort waste by type.
 
-**Holidays & suspended pickups** (Routes & Schedules): the admin can mark a future Monday/Wednesday/Friday as a
-holiday or suspension, with a reason. That date then has no regular pickup anywhere (no Start Route, reminder or
+**Suspended pickups** (Routes & Schedules): the admin can mark a future Monday/Wednesday/Friday as a
+suspension, with a reason (only Mon/Wed/Fri can be picked in the calendar). That date then has no regular pickup anywhere (no Start Route, reminder or
 Pick Up Check), residents get a message, and the Resident calendar shows it.
 
 **Official Philippine holidays (Resident app only)**: `src/resident/data/phHolidays.js` lists each year's nationwide
@@ -114,7 +114,7 @@ file. The Admin and Driver apps do not use this list.
 **Resident calendar** (Pickup Days): a month calendar with an icon on each pickup day, from saved records:
 truck = pickup scheduled; check = the resident said they disposed of their garbage; skip = they answered "not
 today"; X = they could not dispose, or a Pick Up Check was sent, the day passed and it was never completed;
-! = official holiday or barangay holiday/suspension. Future days are never marked X.
+! = official holiday or barangay suspension. Future days are never marked X.
 
 ### Admin: Collector's Management, profile, sign-in
 

@@ -219,7 +219,7 @@ export default function DashboardPage() {
                 {isPickupDate(todayISO(), data.scheduleExceptions)
                   ? 'Garbage collection day'
                   : isCollectionDay(today)
-                    ? 'No collection (holiday / suspension)'
+                    ? 'No collection (suspended)'
                     : `No collection (${scheduleLabel} only)`}
               </dd>
               <dt>Time window</dt>

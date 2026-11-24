@@ -6,7 +6,7 @@ import ToggleRow from '../../components/ToggleRow.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useResident } from '../../auth/useAccount.js'
 import { barangay } from '../../data/barangay.js'
-import { dayOfDate, exceptionKinds, scheduleLabel } from '../../data/schedule.js'
+import { dayOfDate, exceptionLabel, scheduleLabel } from '../../data/schedule.js'
 import { calendarLegend, dayStatus } from '../../data/calendarStatus.js'
 import { feedbackReasonLabel } from '../../data/collectionFeedback.js'
 import { holidayTypes, holidaysListedFor } from '../data/phHolidays.js'
@@ -176,7 +176,7 @@ export default function SchedulePage() {
                 )}
                 {sel.exception && (
                   <p className="m-muted">
-                    {exceptionKinds[sel.exception.kind]}: {sel.exception.reason}.
+                    {exceptionLabel(sel.exception.kind)}: {sel.exception.reason}.
                   </p>
                 )}
                 <p className="m-muted">

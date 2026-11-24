@@ -1,0 +1,140 @@
+/* Date field + calendar popover (DatePicker.jsx) */
+.ct-datepicker__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ct-datepicker__trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ct-datepicker__trigger.is-empty span,
+.ct-datepicker__trigger svg {
+  color: var(--ct-text-muted);
+}
+
+/* Drawn on <body> so no card or table can clip or cover it. The bottom
+   padding leaves room to scroll a small gap under the calendar. */
+.ct-datepicker-layer {
+  position: absolute;
+  z-index: 1000;
+  padding-bottom: 8px;
+}
+
+/* Fixed size: the same width and height for every month (6 rows are always drawn). */
+.ct-datepicker {
+  --dp-cell: 34px;
+  box-sizing: border-box;
+  width: calc(var(--dp-cell) * 7 + 2px * 6 + 24px + 2px);
+  padding: 12px;
+  background: var(--ct-surface);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius);
+  box-shadow: 0 10px 30px rgba(6, 78, 50, 0.18);
+  font-family: var(--ct-font);
+  color: var(--ct-text);
+}
+
+.ct-datepicker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.ct-datepicker__nav {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-sm);
+  background: var(--ct-surface);
+  color: var(--ct-text);
+  cursor: pointer;
+}
+
+.ct-datepicker__nav:hover:not(:disabled) {
+  background: var(--ct-green-50);
+}
+
+.ct-datepicker__nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ct-datepicker__dows,
+.ct-datepicker__grid {
+  display: grid;
+  grid-template-columns: repeat(7, var(--dp-cell));
+  gap: 2px;
+}
+
+.ct-datepicker__grid {
+  grid-template-rows: repeat(6, var(--dp-cell));
+}
+
+.ct-datepicker__dow {
+  height: 22px;
+  line-height: 22px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ct-text-muted);
+}
+
+.ct-datepicker__day {
+  width: var(--dp-cell);
+  height: var(--dp-cell);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-sm);
+  background: transparent;
+  color: var(--ct-text);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.ct-datepicker__day:hover:not(:disabled) {
+  background: var(--ct-green-100);
+}
+
+.ct-datepicker__day:focus-visible {
+  outline: 2px solid var(--ct-green-700);
+  outline-offset: 1px;
+}
+
+.ct-datepicker__day.is-today {
+  box-shadow: inset 0 0 0 1px var(--ct-green-700);
+}
+
+.ct-datepicker__day.is-selected {
+  background: var(--ct-green-900);
+  color: #fff;
+  font-weight: 600;
+}
+
+.ct-datepicker__day:disabled {
+  color: var(--ct-text-muted);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Very small phones: smaller cells, still the same size for every month. */
+@media (max-width: 300px) {
+  .ct-datepicker {
+    --dp-cell: 30px;
+  }
+}

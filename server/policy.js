@@ -397,7 +397,7 @@ export function prepareAction(state, user, action) {
     case 'schedule/addException': {
       const date = String(p.date ?? '')
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00`))) fail('Choose a valid date.')
-      if (!isCollectionDate(date)) fail(`Only ${scheduleLabel} have pickups, so only those dates can be a holiday or suspension.`)
+      if (!isCollectionDate(date)) fail(`Only ${scheduleLabel} have pickups, so only those dates can be suspended.`)
       if (date < todayISO()) fail('Choose today or a future date.')
       return out({ date, kind: oneOf(p.kind, Object.keys(exceptionKinds), 'Type'), reason: str(p.reason, 'Reason', { min: 3, max: 80 }) })
     }
@@ -443,7 +443,7 @@ export function prepareAction(state, user, action) {
       if (!resident) fail('Your account was not found.', 404)
       // Answers are always for TODAY, and only on an official collection day.
       if (!isCollectionDay(todayName())) fail(`There is no garbage pickup today (pickup days: ${scheduleLabel}).`, 409)
-      if (!isPickupDate(todayISO(), state.scheduleExceptions)) fail('There is no garbage pickup today (holiday or suspension).', 409)
+      if (!isPickupDate(todayISO(), state.scheduleExceptions)) fail('There is no garbage pickup today (collection suspended).', 409)
       if (phHolidayOn(todayISO())) fail(`There is no garbage pickup today (${phHolidayOn(todayISO()).name}).`, 409)
       const yesNo = (v, label) => {
         if (v === null || v === undefined) return null

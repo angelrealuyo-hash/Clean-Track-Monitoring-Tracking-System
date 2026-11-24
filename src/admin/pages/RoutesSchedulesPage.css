@@ -20,22 +20,67 @@
   cursor: not-allowed;
 }
 
-/* Holidays & suspended pickups */
+/* Suspended pickups. Sized by the card's own width (it shares the row with the
+   detail panel), so the fields wrap before they get cramped. */
+.exceptions-card .ct-card__body {
+  container-type: inline-size;
+}
+
 .exceptions-form {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(150px, 1fr) minmax(160px, 1.5fr) auto;
-  gap: 10px;
-  align-items: end;
+  grid-template-columns: minmax(170px, 1fr) minmax(140px, 0.8fr) minmax(180px, 1.6fr) auto;
+  gap: 12px;
+  align-items: start;
   margin-bottom: 12px;
 }
 
 .exceptions-form .ct-field {
+  min-width: 0;
   margin: 0;
 }
 
-@media (max-width: 760px) {
+.exceptions-form__submit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exceptions-form__submit .ct-btn {
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* Medium: Date + Type on one row, Reason + Add below. */
+@container (max-width: 680px) {
+  .exceptions-form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .exceptions-form > :nth-child(2) {
+    grid-column: 2 / -1;
+  }
+
+  .exceptions-form > :nth-child(3) {
+    grid-column: 1 / 3;
+  }
+}
+
+/* Narrow (phones): one field per row. */
+@container (max-width: 420px) {
   .exceptions-form {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exceptions-form > * {
+    grid-column: auto !important;
+  }
+
+  .exceptions-form__submit .ct-label {
+    display: none;
+  }
+
+  .exceptions-form__submit .ct-btn {
+    width: 100%;
   }
 }
 

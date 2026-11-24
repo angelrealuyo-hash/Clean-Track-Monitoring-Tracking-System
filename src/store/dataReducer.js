@@ -2,7 +2,7 @@
 import { todayISO } from '../utils/format.js'
 import { IDLE_CONTROL, isCollectionStop, simElapsed } from '../services/trackingSimulation.js'
 import { feedbackId } from '../data/collectionFeedback.js'
-import { exceptionKinds, isPickupDate } from '../data/schedule.js'
+import { exceptionLabel, isPickupDate } from '../data/schedule.js'
 import { formatDate } from '../utils/format.js'
 
 const now = () => new Date().toISOString()
@@ -490,7 +490,7 @@ export function dataReducer(state, action) {
     case 'crew/delete':
       return { ...state, crew: (state.crew ?? []).filter((c) => c.id !== p.id) }
 
-    // Holiday / suspension: that date has no regular pickup. Residents are told.
+    // Suspension: that date has no regular pickup. Residents are told.
     case 'schedule/addException': {
       const list = (state.scheduleExceptions ?? []).filter((x) => x.date !== p.date)
       const item = { date: p.date, kind: p.kind, reason: p.reason, createdAt: now() }
@@ -504,7 +504,7 @@ export function dataReducer(state, action) {
           priority: 'high',
           key: `exception-${p.date}`,
           title: `No garbage pickup on ${formatDate(p.date)}`,
-          body: `${exceptionKinds[p.kind]}: ${p.reason}`,
+          body: `${exceptionLabel(p.kind)}: ${p.reason}`,
           link: { label: 'See pickup days', to: '/resident/schedule' },
         }).filter((n, i, all) => !n.key || all.findIndex((m) => m.key === n.key) === i),
       }
