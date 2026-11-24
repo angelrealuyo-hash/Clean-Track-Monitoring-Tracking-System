@@ -7,7 +7,20 @@ import { isCollectionStop } from '../src/services/trackingSimulation.js'
 import { userKeyOf } from '../src/store/view.js'
 import { normalizePhone } from '../src/utils/validate.js'
 import { reportCategories } from '../src/data/reports.js'
-import { maintenanceTypes } from '../src/data/truck.js'
+import {
+  MIN_TRUCK_YEAR,
+  RESERVE_STATUSES,
+  SERVICE_STATUSES,
+  allTrucks,
+  findTruck,
+  isOutOfService,
+  joinModel,
+  maintenanceTypes,
+  maxTruckYear,
+  plateKey,
+  truckDeleteBlock,
+  truckIdKey,
+} from '../src/data/truck.js'
 import { COLLECTION, exceptionKinds, exceptionOn, isCollectionDate, isCollectionDay, isPickupDate, scheduleLabel } from '../src/data/schedule.js'
 import { barangay } from '../src/data/barangay.js'
 import { feedbackReasons } from '../src/data/collectionFeedback.js'
@@ -78,7 +91,7 @@ const profilePhoto = (v, current) => {
 
 const ROLE_ACTIONS = {
   admin: new Set([
-    'truck/update', 'truck/assignDriver', 'truck/logMaintenance',
+    'truck/add', 'truck/update', 'truck/delete', 'truck/setService', 'truck/assignDriver', 'truck/logMaintenance',
     'driver/add', 'driver/update', 'driver/delete',
     'route/update', 'route/updateStop', 'route/addStop', 'route/removeStop', 'route/moveStop',
     'schedule/update',
@@ -130,6 +143,45 @@ function checkNotListed(state, name, key) {
   if (collectorsOf(state).some((c) => c.key !== key && sameName(c.name, name))) fail(`${name} is already on the collectors list.`, 409)
 }
 
+// ---------- Trucks ----------
+const MAX_TRUCKS = 20
+const isoDate = (v, label) => {
+  const s = String(v ?? '')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(`${s}T00:00`))) fail(`${label} is not a valid date.`)
+  return s
+}
+const outOfServiceWord = (status) => (status === 'inactive' ? 'inactive' : 'in maintenance')
+const truckStatusWord = (status) => ({ inactive: 'inactive', maintenance: 'under maintenance' })[status] ?? status
+
+// Vehicle details shared by Add Truck and Edit Truck. `current` is the truck
+// being edited (null when adding); it is left out of the duplicate check.
+function truckDetails(state, p, current, statuses) {
+  const plateNumber = str(p.plateNumber, 'Plate number', { min: 2, max: 15 }).toUpperCase().replace(/\s+/g, ' ')
+  if (plateKey(plateNumber).length < 2) fail('Plate number is not valid.')
+  const clash = allTrucks(state).find((t) => t !== current && t.id !== current?.id && plateKey(t.plateNumber) === plateKey(plateNumber))
+  if (clash) fail(`Plate number ${plateNumber} is already registered to ${clash.id}.`, 409)
+  let model
+  if (p.year !== undefined) {
+    // Year and model sent separately (Add/Edit Truck form).
+    const year = p.year === '' || p.year === null ? '' : String(int(p.year, 'Year', MIN_TRUCK_YEAR, maxTruckYear()))
+    model = joinModel(year, typeof p.model === 'string' ? p.model.slice(0, 50) : '')
+  } else {
+    model = typeof p.model === 'string' ? p.model.trim().slice(0, 60) : current?.model ?? ''
+  }
+  return {
+    plateNumber,
+    type: str(p.type, 'Vehicle type', { max: 40 }),
+    model,
+    capacityTons: (() => {
+      const n = Number(p.capacityTons)
+      if (!Number.isFinite(n) || n <= 0 || n > 30) fail('Capacity must be between 0.1 and 30 tons.')
+      return n
+    })(),
+    fuel: str(p.fuel, 'Fuel type', { max: 30 }),
+    status: oneOf(p.status, statuses, 'Status'),
+  }
+}
+
 /**
  * @returns {{ action: object, effects: object[] }}
  */
@@ -146,21 +198,45 @@ export function prepareAction(state, user, action) {
 
   switch (action.type) {
     // ---------- Truck ----------
+    case 'truck/add': {
+      if (allTrucks(state).length >= MAX_TRUCKS) fail(`CleanTrack keeps up to ${MAX_TRUCKS} trucks. Delete an unused truck first.`, 409)
+      const id = truckIdKey(str(p.id, 'Truck ID', { min: 2, max: 12 }))
+      if (!/^[A-Z0-9][A-Z0-9-]*$/.test(id)) fail('Truck ID may only use letters, numbers and dashes (e.g. TRK-02).')
+      if (allTrucks(state).some((t) => truckIdKey(t.id) === id)) fail(`Truck ID ${id} is already registered.`, 409)
+      const details = truckDetails(state, p, null, RESERVE_STATUSES)
+      return out({
+        id,
+        ...details,
+        odometerKm: p.odometerKm === undefined || p.odometerKm === '' ? 0 : int(p.odometerKm, 'Odometer', 0, 2_000_000),
+        nextServiceDate: p.nextServiceDate ? isoDate(p.nextServiceDate, 'Next service') : null,
+      })
+    }
     case 'truck/update': {
-      const patch = {
-        plateNumber: str(p.plateNumber, 'Plate number', { min: 2, max: 15 }).toUpperCase(),
-        type: str(p.type, 'Vehicle type', { max: 40 }),
-        model: typeof p.model === 'string' ? p.model.trim().slice(0, 60) : state.truck.model,
-        capacityTons: (() => {
-          const n = Number(p.capacityTons)
-          if (!Number.isFinite(n) || n <= 0 || n > 30) fail('Capacity must be between 0.1 and 30 tons.')
-          return n
-        })(),
-        fuel: str(p.fuel, 'Fuel type', { max: 30 }),
-        status: oneOf(p.status, ['active', 'delayed', 'standby', 'maintenance'], 'Status'),
-      }
-      if (patch.status === 'maintenance' && runActive(state)) fail('End the current route before putting the truck in maintenance.', 409)
-      return out(patch)
+      // No id: the service truck (older screens and the API tests send none).
+      const target = p.id === undefined ? state.truck : findTruck(state, p.id)
+      if (!target) fail('That truck does not exist.', 404)
+      const isService = target.id === state.truck.id
+      const patch = truckDetails(state, p, target, isService ? SERVICE_STATUSES : RESERVE_STATUSES)
+      if (isService && isOutOfService(patch.status) && runActive(state))
+        fail(`End the current route before marking the truck ${outOfServiceWord(patch.status)}.`, 409)
+      return out({ id: target.id, ...patch })
+    }
+    case 'truck/delete': {
+      const target = findTruck(state, p.id)
+      if (!target) fail('That truck does not exist.', 404)
+      const block = truckDeleteBlock(state, target)
+      if (block) fail(block, 409)
+      return out({ id: target.id })
+    }
+    case 'truck/setService': {
+      const target = findTruck(state, p.id)
+      if (!target) fail('That truck does not exist.', 404)
+      if (target.id === state.truck.id) fail(`${target.id} is already the service truck.`, 409)
+      if (runActive(state)) fail('A route is in progress. End it before changing the service truck.', 409)
+      if (state.simulation?.status === 'running' || state.simulation?.status === 'paused')
+        fail('Stop the simulated truck (Live Tracking) before changing the service truck.', 409)
+      if (target.status !== 'active') fail(`${target.id} is ${truckStatusWord(target.status)}. Set it to Active first.`, 409)
+      return out({ id: target.id })
     }
     case 'truck/assignDriver': {
       const driverId = p.driverId ?? null
@@ -172,14 +248,19 @@ export function prepareAction(state, user, action) {
       return out({ driverId })
     }
     case 'truck/logMaintenance': {
-      const km = int(p.odometerKm, 'Odometer', state.truck.odometerKm, 2_000_000)
+      const target = p.truckId === undefined ? state.truck : findTruck(state, p.truckId)
+      if (!target) fail('That truck does not exist.', 404)
+      const isService = target.id === state.truck.id
+      const km = int(p.odometerKm, 'Odometer', target.odometerKm ?? 0, 2_000_000)
       const date = str(p.date, 'Service date', { max: 10 })
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail('Service date is not valid.')
       const next = p.nextServiceDate ? String(p.nextServiceDate) : ''
       if (next && (!/^\d{4}-\d{2}-\d{2}$/.test(next) || next <= date)) fail('Next service must be after the service date.')
-      const newStatus = oneOf(p.newStatus, ['active', 'delayed', 'standby', 'maintenance'], 'Status')
-      if (newStatus === 'maintenance' && runActive(state)) fail('End the current route before putting the truck in maintenance.', 409)
+      const newStatus = oneOf(p.newStatus, isService ? SERVICE_STATUSES : RESERVE_STATUSES, 'Status')
+      if (isService && isOutOfService(newStatus) && runActive(state))
+        fail(`End the current route before marking the truck ${outOfServiceWord(newStatus)}.`, 409)
       return out({
+        truckId: target.id,
         type: oneOf(p.type, maintenanceTypes, 'Maintenance type'),
         odometerKm: km,
         date,
@@ -316,7 +397,8 @@ export function prepareAction(state, user, action) {
         fail(`No collection today. Regular routes run on ${scheduleLabel} only.`, 409)
       if (user.role === 'driver' && !isPickupDate(todayISO(), state.scheduleExceptions))
         fail(`No collection today: ${exceptionOn(todayISO(), state.scheduleExceptions).reason}.`, 409)
-      if (state.truck.status === 'maintenance') fail(`Truck ${state.truck.id} is in maintenance. The route cannot start.`, 409)
+      if (isOutOfService(state.truck.status))
+        fail(`Truck ${state.truck.id} is ${outOfServiceWord(state.truck.status)}. The route cannot start.`, 409)
       if (!state.route.stops.some(isCollectionStop)) fail('The route has no pickup points.', 409)
       return out(user.role === 'driver' ? { by: 'driver', driverId: user.refId } : { by: 'admin' })
     }
@@ -397,7 +479,7 @@ export function prepareAction(state, user, action) {
     case 'schedule/addException': {
       const date = String(p.date ?? '')
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00`))) fail('Choose a valid date.')
-      if (!isCollectionDate(date)) fail(`Only ${scheduleLabel} have pickups, so only those dates can be a holiday or suspension.`)
+      if (!isCollectionDate(date)) fail(`Only ${scheduleLabel} have pickups, so only those dates can be suspended.`)
       if (date < todayISO()) fail('Choose today or a future date.')
       return out({ date, kind: oneOf(p.kind, Object.keys(exceptionKinds), 'Type'), reason: str(p.reason, 'Reason', { min: 3, max: 80 }) })
     }
@@ -443,7 +525,7 @@ export function prepareAction(state, user, action) {
       if (!resident) fail('Your account was not found.', 404)
       // Answers are always for TODAY, and only on an official collection day.
       if (!isCollectionDay(todayName())) fail(`There is no garbage pickup today (pickup days: ${scheduleLabel}).`, 409)
-      if (!isPickupDate(todayISO(), state.scheduleExceptions)) fail('There is no garbage pickup today (holiday or suspension).', 409)
+      if (!isPickupDate(todayISO(), state.scheduleExceptions)) fail('There is no garbage pickup today (collection suspended).', 409)
       if (phHolidayOn(todayISO())) fail(`There is no garbage pickup today (${phHolidayOn(todayISO()).name}).`, 409)
       const yesNo = (v, label) => {
         if (v === null || v === undefined) return null

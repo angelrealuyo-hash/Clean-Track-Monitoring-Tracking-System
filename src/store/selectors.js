@@ -61,7 +61,8 @@ export const truckStatusMeta = {
   active: { tone: 'green', label: 'Active' },
   delayed: { tone: 'amber', label: 'Delayed' },
   standby: { tone: 'blue', label: 'Standby' },
-  maintenance: { tone: 'red', label: 'In maintenance' },
+  inactive: { tone: 'gray', label: 'Inactive' },
+  maintenance: { tone: 'red', label: 'Under maintenance' },
 }
 
 export const priorityMeta = {

@@ -34,8 +34,9 @@ export default function AdminLayout() {
   const unreadAdmin = adminFeed.filter((n) => !n.read).length
   // Newest first; the dropdown shows a short preview.
   const preview = [...adminFeed].sort((a, b) => String(b.time).localeCompare(String(a.time))).slice(0, 5)
+  const truckCount = 1 + (data.reserveTrucks?.length ?? 0)
   const badges = {
-    truck: { text: '1 Truck', className: 'admin-nav__badge--soft' },
+    truck: { text: `${truckCount} ${truckCount === 1 ? 'Truck' : 'Trucks'}`, className: 'admin-nav__badge--soft' },
     reports: openReports ? { text: openReports, className: 'admin-nav__badge--amber' } : null,
     notifications: unreadAdmin ? { text: unreadAdmin, className: 'admin-nav__badge--red' } : null,
   }

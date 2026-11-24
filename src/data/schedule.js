@@ -27,13 +27,15 @@ export function normalizeSchedule(weekly = []) {
 
 export const scheduleLabel = 'Monday, Wednesday and Friday'
 
-// ---------- Holidays and suspensions (set by the admin) ----------
+// ---------- Suspended pickups (set by the admin) ----------
 export const exceptionKinds = {
-  holiday: 'Holiday',
-  suspended: 'Collection suspended',
+  suspended: 'Suspension',
 }
+
+// Older records may still say 'holiday'; they are shown as a suspension.
+export const exceptionLabel = (kind) => exceptionKinds[kind] ?? exceptionKinds.suspended
 
 export const exceptionOn = (iso, exceptions = []) => exceptions.find((x) => x.date === iso) ?? null
 
-// Is there a regular pickup on this date? (official day and no holiday/suspension)
+// Is there a regular pickup on this date? (official day and not suspended)
 export const isPickupDate = (iso, exceptions = []) => isCollectionDate(iso) && !exceptionOn(iso, exceptions)

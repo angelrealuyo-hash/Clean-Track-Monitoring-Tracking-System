@@ -7,7 +7,8 @@ import { truckStatusMeta } from '../../../store/selectors.js'
 import { todayISO } from '../../../utils/format.js'
 
 // PDF page 16 (Log Maintenance Service)
-export default function LogMaintenanceModal({ truck, onSave, onClose }) {
+// `statuses` = the statuses this truck may have after the service.
+export default function LogMaintenanceModal({ truck, statuses, onSave, onClose }) {
   const [form, setForm] = useState({
     type: maintenanceTypes[0],
     odometerKm: String(truck.odometerKm),
@@ -69,9 +70,9 @@ export default function LogMaintenanceModal({ truck, onSave, onClose }) {
         </Field>
         <Field label="New Vehicle Status" htmlFor="m-status">
           <select id="m-status" className="ct-input" value={form.newStatus} onChange={set('newStatus')}>
-            {Object.entries(truckStatusMeta).map(([value, m]) => (
+            {statuses.map((value) => (
               <option key={value} value={value}>
-                {m.label}
+                {truckStatusMeta[value].label}
               </option>
             ))}
           </select>

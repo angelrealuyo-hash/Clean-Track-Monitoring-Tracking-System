@@ -27,6 +27,9 @@ export function useTruckForResident() {
   } else if (data.truck.status === 'maintenance' && tracking.state.status === 'idle') {
     label = 'Truck is being repaired'
     tone = 'red'
+  } else if (data.truck.status === 'inactive' && tracking.state.status === 'idle') {
+    label = 'Truck is not in service'
+    tone = 'gray'
   } else if (distance.state === 'none') {
     label = 'Your area is not on the route'
     tone = 'gray'

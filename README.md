@@ -1,7 +1,7 @@
 # CleanTrack — Garbage Truck Monitoring System
 
-Capstone project for **Barangay Rizal, Taguig City**: one barangay, one garbage truck (to be confirmed with
-barangay personnel). Three apps share one server and database:
+Capstone project for **Barangay Rizal, Taguig City**: one barangay and one collection route, run by one service
+truck (to be confirmed with barangay personnel); more trucks can be registered as reserve trucks. Three apps share one server and database:
 
 | App | For | Open |
 |---|---|---|
@@ -98,8 +98,8 @@ apps and the server). Admins can change the pickup time of those days, not the d
 cannot start a regular route and residents get no pickup reminder or Pick Up Check; a stop the office records on
 another day is saved as a **special** run. Residents are not asked to sort waste by type.
 
-**Holidays & suspended pickups** (Routes & Schedules): the admin can mark a future Monday/Wednesday/Friday as a
-holiday or suspension, with a reason. That date then has no regular pickup anywhere (no Start Route, reminder or
+**Suspended pickups** (Routes & Schedules): the admin can mark a future Monday/Wednesday/Friday as a
+suspension, with a reason (only Mon/Wed/Fri can be picked in the calendar). That date then has no regular pickup anywhere (no Start Route, reminder or
 Pick Up Check), residents get a message, and the Resident calendar shows it.
 
 **Official Philippine holidays (Resident app only)**: `src/resident/data/phHolidays.js` lists each year's nationwide
@@ -114,7 +114,28 @@ file. The Admin and Driver apps do not use this list.
 **Resident calendar** (Pickup Days): a month calendar with an icon on each pickup day, from saved records:
 truck = pickup scheduled; check = the resident said they disposed of their garbage; skip = they answered "not
 today"; X = they could not dispose, or a Pick Up Check was sent, the day passed and it was never completed;
-! = official holiday or barangay holiday/suspension. Future days are never marked X.
+! = official holiday or barangay suspension. Future days are never marked X.
+
+### Admin: Truck Management
+
+**Truck Management** lists every registered truck. The **service truck** runs the collection route: it is the truck on
+Live Tracking, in the Driver app and on the Collector's Management roster. Other trucks are **reserve trucks**.
+
+- **Add Truck**: Truck ID (fixed after adding), plate number, vehicle type, year, model, capacity, fuel type, odometer,
+  next service and status. Truck IDs and plate numbers must be unique (`abc 1024` and `ABC-1024` count as the same
+  plate). A new truck starts as a reserve truck with no driver.
+- **Edit / status**: any truck can be edited. Reserve trucks are **Active**, **Inactive** or **Under maintenance**; the
+  service truck can also be Delayed or on Standby. While the service truck is Inactive or Under maintenance, the route
+  cannot start (Driver app and server).
+- **Make Service Truck** (reserve truck that is Active, no route in progress, simulated truck stopped): that truck
+  takes the route, and the driver on duty and the Morning/Afternoon roster move to it. The old service truck becomes a
+  reserve truck and keeps its records.
+- **Delete** asks for confirmation and is refused for the service truck, a truck that still has collectors, or a
+  truck with saved collection runs (set it to Inactive instead, so run history stays complete).
+- Clicking a row shows that truck's details and maintenance history; **Log Maintenance** works for any truck.
+
+Trucks are stored in the existing `trucks` and `maintenance_records` tables (no migration): the service truck is the
+row with a `route_id`. Year and model are stored together in the `model` column (e.g. `2021 Hino 300`), as before.
 
 ### Admin: Collector's Management, profile, sign-in
 

@@ -2,7 +2,8 @@
 import { todayISO } from '../utils/format.js'
 import { IDLE_CONTROL, isCollectionStop, simElapsed } from '../services/trackingSimulation.js'
 import { feedbackId } from '../data/collectionFeedback.js'
-import { exceptionKinds, isPickupDate } from '../data/schedule.js'
+import { exceptionLabel, isPickupDate } from '../data/schedule.js'
+import { RESERVE_STATUSES } from '../data/truck.js'
 import { formatDate } from '../utils/format.js'
 
 const now = () => new Date().toISOString()
@@ -140,26 +141,74 @@ function addReport(state, p) {
   }
 }
 
+// Applies fn to the truck with this id (the service truck when id is missing).
+function withTruck(state, id, fn) {
+  if (id === undefined || id === null || id === state.truck.id) return { ...state, truck: fn(state.truck) }
+  return { ...state, reserveTrucks: (state.reserveTrucks ?? []).map((t) => (t.id === id ? fn(t) : t)) }
+}
+
 export function dataReducer(state, action) {
   const p = action.payload
   switch (action.type) {
-    case 'truck/update':
-      return { ...state, truck: { ...state.truck, ...p } }
+    // ---------- Trucks (service truck + reserve trucks) ----------
+    // No id (older callers) means the service truck.
+    case 'truck/update': {
+      const { id, ...patch } = p
+      return withTruck(state, id, (t) => ({ ...t, ...patch }))
+    }
 
     case 'truck/assignDriver':
       return { ...state, truck: { ...state.truck, driverId: p.driverId } }
 
     case 'truck/logMaintenance': {
       const record = { date: p.date, type: p.type, odometerKm: p.odometerKm, notes: p.notes }
+      return withTruck(state, p.truckId, (t) => ({
+        ...t,
+        odometerKm: Math.max(t.odometerKm ?? 0, p.odometerKm),
+        status: p.newStatus,
+        maintenance: [record, ...(t.maintenance ?? [])],
+        nextServiceDate: p.nextServiceDate || t.nextServiceDate,
+      }))
+    }
+
+    // A new truck starts as a reserve truck (no driver, not on the route).
+    case 'truck/add': {
+      const added = {
+        id: p.id,
+        plateNumber: p.plateNumber,
+        type: p.type,
+        model: p.model ?? '',
+        capacityTons: p.capacityTons,
+        fuel: p.fuel,
+        odometerKm: p.odometerKm ?? 0,
+        driverId: null,
+        routeId: null,
+        status: p.status,
+        maintenance: [],
+        nextServiceDate: p.nextServiceDate || null,
+      }
+      return { ...state, reserveTrucks: [...(state.reserveTrucks ?? []), added] }
+    }
+
+    case 'truck/delete':
+      return { ...state, reserveTrucks: (state.reserveTrucks ?? []).filter((t) => t.id !== p.id) }
+
+    // A reserve truck takes over the route. The driver on duty, the shift
+    // roster (drivers and crew) and the route move to it; the old service
+    // truck becomes a reserve truck with no driver.
+    case 'truck/setService': {
+      const next = (state.reserveTrucks ?? []).find((t) => t.id === p.id)
+      if (!next) return state
+      const old = state.truck
+      const moveTo = (person) => (person.truckId === old.id ? { ...person, truckId: next.id } : person)
+      const demoted = { ...old, driverId: null, routeId: null, status: RESERVE_STATUSES.includes(old.status) ? old.status : 'active' }
       return {
         ...state,
-        truck: {
-          ...state.truck,
-          odometerKm: Math.max(state.truck.odometerKm, p.odometerKm),
-          status: p.newStatus,
-          maintenance: [record, ...state.truck.maintenance],
-          nextServiceDate: p.nextServiceDate || state.truck.nextServiceDate,
-        },
+        truck: { ...next, driverId: old.driverId ?? null, routeId: state.route?.id ?? old.routeId ?? null },
+        reserveTrucks: state.reserveTrucks.map((t) => (t.id === next.id ? demoted : t)),
+        drivers: state.drivers.map(moveTo),
+        crew: (state.crew ?? []).map(moveTo),
+        route: state.route ? { ...state.route, truckId: next.id } : state.route,
       }
     }
 
@@ -490,7 +539,7 @@ export function dataReducer(state, action) {
     case 'crew/delete':
       return { ...state, crew: (state.crew ?? []).filter((c) => c.id !== p.id) }
 
-    // Holiday / suspension: that date has no regular pickup. Residents are told.
+    // Suspension: that date has no regular pickup. Residents are told.
     case 'schedule/addException': {
       const list = (state.scheduleExceptions ?? []).filter((x) => x.date !== p.date)
       const item = { date: p.date, kind: p.kind, reason: p.reason, createdAt: now() }
@@ -504,7 +553,7 @@ export function dataReducer(state, action) {
           priority: 'high',
           key: `exception-${p.date}`,
           title: `No garbage pickup on ${formatDate(p.date)}`,
-          body: `${exceptionKinds[p.kind]}: ${p.reason}`,
+          body: `${exceptionLabel(p.kind)}: ${p.reason}`,
           link: { label: 'See pickup days', to: '/resident/schedule' },
         }).filter((n, i, all) => !n.key || all.findIndex((m) => m.key === n.key) === i),
       }

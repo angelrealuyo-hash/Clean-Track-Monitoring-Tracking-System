@@ -45,3 +45,37 @@
   flex-basis: 100%;
   font-weight: 400;
 }
+
+/* Fleet list */
+.truck-role {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 4px;
+}
+
+.truck-role.is-service {
+  color: var(--ct-green-700);
+  background: var(--ct-green-100);
+}
+
+.truck-delete:hover:not(:disabled) {
+  color: var(--ct-red-600);
+  background: var(--ct-red-100);
+}
+
+#truck-details .ct-btn:disabled,
+.truck-main .ct-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.truck-swap-list {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--ct-text-muted);
+}
