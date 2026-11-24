@@ -78,9 +78,10 @@ export default function DashboardPage() {
 
       {/* Summary cards */}
       <section className="dashboard__stats" aria-label="Summary">
-        <StatCard label="Registered Truck" icon={Truck} value="1" unit="Truck">
+        <StatCard label="Registered Trucks" icon={Truck} value={1 + (data.reserveTrucks?.length ?? 0)} unit={data.reserveTrucks?.length ? 'Trucks' : 'Truck'}>
           <span>
-            <b>{truck.id}</b> · {truck.type}
+            <b>{truck.id}</b> · {truck.type} · on the route
+            {data.reserveTrucks?.length > 0 && <> · {data.reserveTrucks.length} reserve</>}
           </span>
           <span>
             <StatusBadge tone={truckStatusMeta[truck.status].tone}>{truckStatusMeta[truck.status].label}</StatusBadge>

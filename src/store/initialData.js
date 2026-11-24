@@ -33,6 +33,9 @@ export function createInitialData() {
   return {
     version: DATA_VERSION,
     truck: clone(truck),
+    // Other registered trucks (added in Truck Management). Only the service
+    // truck above runs the route; any of these can be made the service truck.
+    reserveTrucks: [],
     drivers: clone(drivers),
     route: clone(route),
     weeklySchedule: clone(weeklySchedule),

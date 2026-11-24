@@ -15,6 +15,7 @@ export function useRouteActions(r) {
   else if (r.todayException) blocked = `No collection today: ${r.todayException.reason}.`
   else if (!r.collectionToday) blocked = `No collection today. Routes run on ${scheduleLabel} only.`
   else if (truck.status === 'maintenance') blocked = `Truck ${truck.id} is being repaired. Please call the office.`
+  else if (truck.status === 'inactive') blocked = `Truck ${truck.id} is not in service. Please call the office.`
 
   function startRoute() {
     if (blocked) return Promise.resolve({ ok: false })

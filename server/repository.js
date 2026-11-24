@@ -1,6 +1,6 @@
 // Converts between the database tables and the app's data object (the same
 // shape the screens and src/store/dataReducer.js use). The data is small (one
-// barangay, one truck), so saving rewrites the changed tables inside one
+// barangay, a few trucks), so saving rewrites the changed tables inside one
 // transaction, which keeps every save all-or-nothing.
 import { transaction } from './db.js'
 import { normalizeSchedule } from '../src/data/schedule.js'
@@ -17,16 +17,11 @@ export function loadState(db) {
   const meta = Object.fromEntries(db.prepare('SELECT key, value FROM meta').all().map((r) => [r.key, r.value]))
   const settings = Object.fromEntries(db.prepare('SELECT key, value_json FROM settings').all().map((r) => [r.key, JSON.parse(r.value_json)]))
 
-  const t = db.prepare('SELECT * FROM trucks LIMIT 1').get()
-  const maintenance = t
-    ? db.prepare('SELECT * FROM maintenance_records WHERE truck_id = ? ORDER BY seq').all(t.id).map((m) => ({
-        date: m.date,
-        type: m.type,
-        ...(m.odometer_km !== null ? { odometerKm: m.odometer_km } : {}),
-        notes: m.notes ?? '',
-      }))
-    : []
-  const truck = t && {
+  // Every registered truck. The service truck is the one on the route
+  // (route_id set); the others are reserve trucks. Older databases have a
+  // single truck, which is the service truck.
+  const maintenanceOf = db.prepare('SELECT * FROM maintenance_records WHERE truck_id = ? ORDER BY seq')
+  const truckRows = db.prepare('SELECT * FROM trucks ORDER BY rowid').all().map((t) => ({
     id: t.id,
     plateNumber: t.plate_number,
     type: t.type,
@@ -37,9 +32,16 @@ export function loadState(db) {
     driverId: t.driver_id,
     routeId: t.route_id,
     status: t.status,
-    maintenance,
+    maintenance: maintenanceOf.all(t.id).map((m) => ({
+      date: m.date,
+      type: m.type,
+      ...(m.odometer_km !== null ? { odometerKm: m.odometer_km } : {}),
+      notes: m.notes ?? '',
+    })),
     nextServiceDate: t.next_service_date,
-  }
+  }))
+  const truck = truckRows.find((t) => t.routeId) ?? truckRows[0] ?? null
+  const reserveTrucks = truckRows.filter((t) => t !== truck)
 
   const accounts = db.prepare("SELECT ref_id, active FROM accounts WHERE role = 'driver'").all()
   const accountOf = Object.fromEntries(accounts.map((a) => [a.ref_id, a.active]))
@@ -221,6 +223,7 @@ export function loadState(db) {
   return {
     version: Number(meta.data_version ?? 0),
     truck,
+    reserveTrucks,
     drivers,
     route,
     weeklySchedule,
@@ -255,12 +258,16 @@ export function saveState(db, state) {
     for (const [k, v] of Object.entries(state.settings)) setSetting.run(k, JSON.stringify(v))
 
     db.exec('DELETE FROM trucks; DELETE FROM maintenance_records;')
-    const t = state.truck
-    db.prepare(
+    const addTruck = db.prepare(
       'INSERT INTO trucks (id, plate_number, type, model, capacity_tons, fuel, odometer_km, driver_id, route_id, status, next_service_date) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-    ).run(t.id, t.plateNumber, t.type, t.model ?? '', t.capacityTons ?? null, t.fuel ?? null, t.odometerKm ?? null, t.driverId ?? null, t.routeId ?? null, t.status, t.nextServiceDate ?? null)
+    )
     const addMaint = db.prepare('INSERT INTO maintenance_records (truck_id, seq, date, type, odometer_km, notes) VALUES (?,?,?,?,?,?)')
-    t.maintenance.forEach((m, i) => addMaint.run(t.id, i, m.date, m.type, m.odometerKm ?? null, m.notes ?? ''))
+    // Service truck first, then reserve trucks (only the service truck keeps a route).
+    for (const t of [state.truck, ...(state.reserveTrucks ?? [])].filter(Boolean)) {
+      const onRoute = t === state.truck
+      addTruck.run(t.id, t.plateNumber, t.type, t.model ?? '', t.capacityTons ?? null, t.fuel ?? null, t.odometerKm ?? null, onRoute ? t.driverId ?? null : null, onRoute ? t.routeId ?? state.route?.id ?? null : null, t.status, t.nextServiceDate ?? null)
+      ;(t.maintenance ?? []).forEach((m, i) => addMaint.run(t.id, i, m.date, m.type, m.odometerKm ?? null, m.notes ?? ''))
+    }
 
     db.exec('DELETE FROM drivers')
     const addDriver = db.prepare('INSERT INTO drivers (id, name, initials, phone, email, license, shift, status, photo, truck_id, active) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
