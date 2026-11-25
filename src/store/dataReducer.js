@@ -1,10 +1,33 @@
 // Every change to the demo data goes through here.
+//
+// Several trucks operate independently: the data keeps `trucks`, `routes` and
+// one `sessions` entry per truck (GPS simulation + route run in progress); see
+// src/store/fleet.js. Truck actions name their truck (`truckId`); an action
+// without one applies to the focus truck (older screens).
 import { todayISO } from '../utils/format.js'
 import { IDLE_CONTROL, isCollectionStop, simElapsed } from '../services/trackingSimulation.js'
 import { feedbackId } from '../data/collectionFeedback.js'
 import { exceptionLabel, isPickupDate } from '../data/schedule.js'
 import { RESERVE_STATUSES } from '../data/truck.js'
 import { formatDate } from '../utils/format.js'
+import {
+  activeRunIdOf,
+  currentRunOf,
+  primaryTruckId,
+  routeById,
+  routeOfStop,
+  routeOfTruck,
+  routesOf,
+  simulationOf,
+  truckById,
+  truckOfRoute,
+  truckOfStop,
+  trucksOf,
+  updateRoute,
+  updateTruck,
+  withLegacy,
+  withSession,
+} from './fleet.js'
 
 const now = () => new Date().toISOString()
 
@@ -43,22 +66,30 @@ function addNotification(state, n) {
   return [notification, ...state.notifications]
 }
 
+// The truck an action without a truckId applies to: the focus truck (a
+// driver's own truck, a resident's purok truck) or the first truck on a route.
+const focusTruckId = (state) => (state.focusTruckId && truckById(state, state.focusTruckId) ? state.focusTruckId : primaryTruckId(state))
+const truckIdFor = (state, id) => id ?? focusTruckId(state)
+const defaultRouteId = (state) => routeOfTruck(state, focusTruckId(state))?.id ?? routesOf(state)[0]?.id ?? null
+
+// Back to the depot, not started (after the truck's route changed).
+const resetSim = (state, truckId) => (truckId ? withSession(state, truckId, () => ({ simulation: { ...IDLE_CONTROL } })) : state)
+
 // ---------- Collection runs ----------
-// A run is one trip of the truck along the route (Start Route -> End Route).
+// A run is one trip of one truck along its route (Start Route -> End Route).
 // It stores every pickup point's result, so history comes from real records.
 
-// The run screens should show: the open run, else today's latest run.
-export function currentRun(state) {
-  const active = state.runs.find((r) => r.id === state.activeRunId)
-  if (active) return active
-  const today = todayISO()
-  return state.runs.find((r) => r.date === today) ?? null
+// The run screens should show: the truck's open run, else its latest run today.
+export function currentRun(state, truckId) {
+  return currentRunOf(state, truckIdFor(state, truckId), todayISO())
 }
 
-function createRun(state, { by = 'admin', driverId } = {}) {
+function createRun(state, { by = 'admin', driverId, truckId } = {}) {
   const date = todayISO()
+  const truck = truckById(state, truckId)
+  const route = routeOfTruck(state, truckId)
   const id = nextId(`RUN-${date}`, state.runs.filter((r) => r.date === date))
-  const driver = state.drivers.find((d) => d.id === (driverId ?? state.truck.driverId))
+  const driver = state.drivers.find((d) => d.id === (driverId ?? truck?.driverId))
   return {
     id,
     date,
@@ -68,13 +99,13 @@ function createRun(state, { by = 'admin', driverId } = {}) {
     startedAt: now(),
     endedAt: null,
     startedBy: by,
-    truckId: state.truck.id,
+    truckId: truck?.id ?? null,
     driverId: driver?.id ?? null,
     driverName: driver?.name ?? 'No driver assigned',
-    routeId: state.route.id,
-    routeName: state.route.name,
+    routeId: route?.id ?? null,
+    routeName: route?.name ?? '',
     // Snapshot of the pickup points, so later route edits do not change history.
-    stops: state.route.stops.filter(isCollectionStop).map((s) => ({ id: s.id, name: s.name, purok: s.purok, households: s.households })),
+    stops: (route?.stops ?? []).filter(isCollectionStop).map((s) => ({ id: s.id, name: s.name, purok: s.purok, households: s.households })),
     results: {},
   }
 }
@@ -88,27 +119,29 @@ function updateRun(state, runId, fn) {
   return { ...state, runs: state.runs.map((r) => (r.id === runId ? fn(r) : r)) }
 }
 
-// Records a stop on the current run; starts a run (by admin) if there is none.
-function recordStop(state, { stopId, status, note = '', by = 'admin', byName = '', bags = null }) {
+// Records a stop on the truck's current run; starts a run (by admin) if there is none.
+function recordStop(state, { truckId: truckIdIn, stopId, status, note = '', by = 'admin', byName = '', bags = null }) {
+  const truckId = truckIdIn ?? truckOfStop(state, stopId)?.id ?? focusTruckId(state)
   let next = state
-  let run = currentRun(next)
+  let run = currentRun(next, truckId)
   // Already recorded as collected: a second tap must not create a new record.
   if (status === 'collected' && run?.results[stopId]?.status === 'collected') return state
   if (!run) {
-    run = createRun(next, { by })
-    next = { ...next, runs: [run, ...next.runs], activeRunId: run.id }
+    run = createRun(next, { by, truckId })
+    next = withSession({ ...next, runs: [run, ...next.runs] }, truckId, () => ({ activeRunId: run.id }))
   }
-  // simAt: the demo truck's clock when this was recorded, so the truck leaves
+  // simAt: this truck's demo clock when this was recorded, so the truck leaves
   // this stop at the same moment in every tab (null if the truck is not running).
-  const sim = next.simulation
+  const sim = simulationOf(next, truckId)
   const simAt = sim && sim.status !== 'idle' && sim.startedAt ? simElapsed(sim, Date.now()) : null
   const result = { status, note, at: now(), by, byName, bags, simAt }
+  const routeStops = routeOfTruck(next, truckId)?.stops ?? []
   return updateRun(next, run.id, (r) => ({
     ...r,
     // A stop added to the route after the run started is added to the run too.
     stops: r.stops.some((s) => s.id === stopId)
       ? r.stops
-      : [...r.stops, ...next.route.stops.filter((s) => s.id === stopId).map((s) => ({ id: s.id, name: s.name, purok: s.purok, households: s.households }))],
+      : [...r.stops, ...routeStops.filter((s) => s.id === stopId).map((s) => ({ id: s.id, name: s.name, purok: s.purok, households: s.households }))],
     results: { ...r.results, [stopId]: result },
   }))
 }
@@ -141,28 +174,49 @@ function addReport(state, p) {
   }
 }
 
-// Applies fn to the truck with this id (the service truck when id is missing).
-function withTruck(state, id, fn) {
-  if (id === undefined || id === null || id === state.truck.id) return { ...state, truck: fn(state.truck) }
-  return { ...state, reserveTrucks: (state.reserveTrucks ?? []).map((t) => (t.id === id ? fn(t) : t)) }
+// Every stop id on every route (stop ids are unique across routes).
+const allStops = (state) => routesOf(state).flatMap((r) => r.stops)
+
+// Changes a route's stops; that route's truck goes back to the depot.
+function editStops(state, routeId, fn) {
+  const route = routeById(state, routeId)
+  if (!route) return state
+  const stops = fn(route.stops)
+  if (stops === route.stops) return state
+  return resetSim(updateRoute(state, routeId, (r) => ({ ...r, stops })), truckOfRoute(state, routeId)?.id)
 }
 
+/**
+ * Applies an action. Returns the same object when nothing changed (the server
+ * relies on this to skip saving), otherwise new data with the single-truck
+ * fields for older screens filled in again (src/store/fleet.js).
+ */
 export function dataReducer(state, action) {
+  const next = reduce(state, action)
+  return next === state ? state : withLegacy(next)
+}
+
+function reduce(state, action) {
   const p = action.payload
   switch (action.type) {
-    // ---------- Trucks (service truck + reserve trucks) ----------
-    // No id (older callers) means the service truck.
+    // ---------- Trucks ----------
     case 'truck/update': {
       const { id, ...patch } = p
-      return withTruck(state, id, (t) => ({ ...t, ...patch }))
+      return updateTruck(state, truckIdFor(state, id), (t) => ({ ...t, ...patch }))
     }
 
-    case 'truck/assignDriver':
-      return { ...state, truck: { ...state.truck, driverId: p.driverId } }
+    // The driver on duty. A driver drives one truck at a time.
+    case 'truck/assignDriver': {
+      const id = truckIdFor(state, p.truckId)
+      return {
+        ...state,
+        trucks: trucksOf(state).map((t) => (t.id === id ? { ...t, driverId: p.driverId } : p.driverId && t.driverId === p.driverId ? { ...t, driverId: null } : t)),
+      }
+    }
 
     case 'truck/logMaintenance': {
       const record = { date: p.date, type: p.type, odometerKm: p.odometerKm, notes: p.notes }
-      return withTruck(state, p.truckId, (t) => ({
+      return updateTruck(state, truckIdFor(state, p.truckId), (t) => ({
         ...t,
         odometerKm: Math.max(t.odometerKm ?? 0, p.odometerKm),
         status: p.newStatus,
@@ -171,7 +225,7 @@ export function dataReducer(state, action) {
       }))
     }
 
-    // A new truck starts as a reserve truck (no driver, not on the route).
+    // A new truck has no route and no driver until the admin assigns them.
     case 'truck/add': {
       const added = {
         id: p.id,
@@ -187,31 +241,45 @@ export function dataReducer(state, action) {
         maintenance: [],
         nextServiceDate: p.nextServiceDate || null,
       }
-      return { ...state, reserveTrucks: [...(state.reserveTrucks ?? []), added] }
+      return { ...state, trucks: [...trucksOf(state), added] }
     }
 
-    case 'truck/delete':
-      return { ...state, reserveTrucks: (state.reserveTrucks ?? []).filter((t) => t.id !== p.id) }
+    case 'truck/delete': {
+      const { [p.id]: _gone, ...sessions } = state.sessions ?? {}
+      return { ...state, trucks: trucksOf(state).filter((t) => t.id !== p.id), sessions }
+    }
 
-    // A reserve truck takes over the route. The driver on duty, the shift
-    // roster (drivers and crew) and the route move to it; the old service
-    // truck becomes a reserve truck with no driver.
+    // Gives a truck a route (or none). Its demo GPS starts again at the depot.
+    // A truck without a route cannot be Delayed or on Standby.
+    case 'truck/assignRoute': {
+      const next = updateTruck(state, p.id, (t) => ({
+        ...t,
+        routeId: p.routeId ?? null,
+        status: p.routeId || RESERVE_STATUSES.includes(t.status) ? t.status : 'active',
+      }))
+      return resetSim(next, p.id)
+    }
+
+    // Older Truck Management screen ("Make Service Truck"): the truck takes
+    // over the first route, with its driver on duty and shift roster; the
+    // previous truck keeps its records but no route or driver.
     case 'truck/setService': {
-      const next = (state.reserveTrucks ?? []).find((t) => t.id === p.id)
-      if (!next) return state
-      const old = state.truck
-      const moveTo = (person) => (person.truckId === old.id ? { ...person, truckId: next.id } : person)
-      const demoted = { ...old, driverId: null, routeId: null, status: RESERVE_STATUSES.includes(old.status) ? old.status : 'active' }
-      return {
-        ...state,
-        truck: { ...next, driverId: old.driverId ?? null, routeId: state.route?.id ?? old.routeId ?? null },
-        reserveTrucks: state.reserveTrucks.map((t) => (t.id === next.id ? demoted : t)),
-        drivers: state.drivers.map(moveTo),
-        crew: (state.crew ?? []).map(moveTo),
-        route: state.route ? { ...state.route, truckId: next.id } : state.route,
-      }
+      const from = truckById(state, primaryTruckId(state))
+      const to = truckById(state, p.id)
+      if (!from || !to || from.id === to.id) return state
+      const moveTo = (person) => (person.truckId === from.id ? { ...person, truckId: to.id } : person)
+      const trucks = trucksOf(state).map((t) => {
+        if (t.id === to.id) return { ...t, routeId: from.routeId, driverId: from.driverId ?? null }
+        if (t.id === from.id) return { ...t, routeId: null, driverId: null, status: RESERVE_STATUSES.includes(t.status) ? t.status : 'active' }
+        return t
+      })
+      // The new route truck is listed first, so older screens show it.
+      const ordered = [trucks.find((t) => t.id === to.id), ...trucks.filter((t) => t.id !== to.id)]
+      const next = { ...state, trucks: ordered, drivers: state.drivers.map(moveTo), crew: (state.crew ?? []).map(moveTo) }
+      return resetSim(resetSim(next, from.id), to.id)
     }
 
+    // ---------- Drivers ----------
     case 'driver/add': {
       const driver = { ...p, id: nextId('DRV', state.drivers), initials: initials(p.name) }
       return { ...state, drivers: [...state.drivers, driver] }
@@ -220,30 +288,78 @@ export function dataReducer(state, action) {
     case 'driver/update': {
       const drivers = state.drivers.map((d) => (d.id === p.id ? { ...d, ...p.patch, ...(p.patch.name ? { initials: initials(p.patch.name) } : {}) } : d))
       const updated = drivers.find((d) => d.id === p.id)
-      // The driver on duty must hold a slot on the truck (active, on a shift).
-      const leftTruck = state.truck.driverId === p.id && updated && !(updated.active !== false && updated.truckId === state.truck.id && updated.shift)
-      return { ...state, drivers, truck: leftTruck ? { ...state.truck, driverId: null } : state.truck }
+      // The driver on duty must hold a slot on that truck (active, on a shift).
+      const holds = (t) => updated && updated.active !== false && updated.truckId === t.id && updated.shift
+      return { ...state, drivers, trucks: trucksOf(state).map((t) => (t.driverId === p.id && !holds(t) ? { ...t, driverId: null } : t)) }
     }
 
     case 'driver/delete':
       return {
         ...state,
         drivers: state.drivers.filter((d) => d.id !== p.id),
-        // A deleted driver can no longer drive the truck.
-        truck: state.truck.driverId === p.id ? { ...state.truck, driverId: null } : state.truck,
+        // A deleted driver can no longer drive a truck.
+        trucks: trucksOf(state).map((t) => (t.driverId === p.id ? { ...t, driverId: null } : t)),
       }
 
-    case 'route/update':
-      return { ...state, route: { ...state.route, ...p } }
+    // ---------- Routes ----------
+    case 'route/add': {
+      const stops = allStops(state)
+      const start = nextId('STP', stops)
+      const end = nextId('STP', [...stops, { id: start }])
+      const route = {
+        id: p.id ?? nextId('RT', routesOf(state)),
+        name: p.name,
+        shortName: p.shortName ?? '',
+        startTime: p.startTime ?? '',
+        coordinatesVerified: false,
+        stops: [
+          { id: start, name: 'Truck Depot (Start)', purok: 'Depot', coords: p.depot, households: 0 },
+          { id: end, name: 'Truck Depot (End)', purok: 'Depot', coords: p.depot, households: 0 },
+        ],
+      }
+      return { ...state, routes: [...routesOf(state), route] }
+    }
+
+    case 'route/delete':
+      return { ...state, routes: routesOf(state).filter((r) => r.id !== p.id) }
+
+    case 'route/update': {
+      const { routeId, ...patch } = p
+      return updateRoute(state, routeId ?? defaultRouteId(state), (r) => ({ ...r, ...patch }))
+    }
 
     case 'route/updateStop':
-      return {
-        ...state,
-        route: {
-          ...state.route,
-          stops: state.route.stops.map((s) => (s.id === p.id ? { ...s, ...p.patch } : s)),
-        },
-      }
+      return updateRoute(state, routeOfStop(state, p.id)?.id, (r) => ({ ...r, stops: r.stops.map((s) => (s.id === p.id ? { ...s, ...p.patch } : s)) }))
+
+    case 'route/addStop': {
+      const routeId = routeOfStop(state, p.afterId)?.id ?? p.routeId ?? defaultRouteId(state)
+      const stop = { id: nextId('STP', allStops(state)), name: p.name, purok: p.purok, households: p.households, coords: p.coords }
+      return editStops(state, routeId, (stops) => {
+        // Insert after the chosen stop; never after the end depot.
+        const after = stops.findIndex((s) => s.id === p.afterId)
+        const at = after === -1 || after >= stops.length - 1 ? stops.length - 1 : after + 1
+        return [...stops.slice(0, at), stop, ...stops.slice(at)]
+      })
+    }
+
+    case 'route/removeStop':
+      return editStops(state, routeOfStop(state, p.id)?.id, (stops) => {
+        const stop = stops.find((s) => s.id === p.id)
+        // Depots stay, and the route keeps at least one pickup point.
+        if (!stop || !isCollectionStop(stop) || stops.filter(isCollectionStop).length <= 1) return stops
+        return stops.filter((s) => s.id !== p.id)
+      })
+
+    case 'route/moveStop':
+      return editStops(state, routeOfStop(state, p.id)?.id, (stops) => {
+        const i = stops.findIndex((s) => s.id === p.id)
+        const j = i + p.dir
+        // Pickup points move only between the start depot (0) and end depot (last).
+        if (i < 1 || i > stops.length - 2 || j < 1 || j > stops.length - 2) return stops
+        const moved = [...stops]
+        ;[moved[i], moved[j]] = [moved[j], moved[i]]
+        return moved
+      })
 
     case 'schedule/update':
       return {
@@ -251,57 +367,30 @@ export function dataReducer(state, action) {
         weeklySchedule: state.weeklySchedule.map((d) => (d.day === p.day ? { ...d, ...p.patch } : d)),
       }
 
+    // ---------- Collection runs (per truck) ----------
     case 'run/start': {
-      const open = state.runs.find((r) => r.id === state.activeRunId)
+      const truckId = truckIdFor(state, p.truckId)
+      const open = state.runs.find((r) => r.id === activeRunIdOf(state, truckId))
       if (open && open.date === todayISO()) return state // already running today
       let next = state
       if (open) next = updateRun(next, open.id, closeRun) // left open on an earlier day
-      const run = createRun(next, p)
-      return { ...next, runs: [run, ...next.runs], activeRunId: run.id }
+      const run = createRun(next, { ...p, truckId })
+      return withSession({ ...next, runs: [run, ...next.runs] }, truckId, () => ({ activeRunId: run.id }))
     }
 
     case 'run/end': {
-      if (!state.activeRunId) return state
-      return { ...updateRun(state, state.activeRunId, closeRun), activeRunId: null }
+      const truckId = truckIdFor(state, p?.truckId)
+      const runId = activeRunIdOf(state, truckId)
+      if (!runId) return state
+      return withSession(updateRun(state, runId, closeRun), truckId, () => ({ activeRunId: null }))
     }
 
     case 'collection/mark':
       return recordStop(state, p)
 
-    // ---------- Demo truck (simulated GPS) controls ----------
-    case 'sim/start': {
-      // force: restart even if the truck already reached the end of the route.
-      const status = state.simulation?.status
-      if (!p?.force && (status === 'running' || status === 'paused')) return state
-      return { ...state, simulation: { ...IDLE_CONTROL, status: 'running', startedAt: now() } }
-    }
-
-    case 'sim/pause':
-      if (state.simulation?.status !== 'running') return state
-      return { ...state, simulation: { ...state.simulation, status: 'paused', pausedAt: now() } }
-
-    case 'sim/resume': {
-      const sim = state.simulation
-      if (sim?.status !== 'paused') return state
-      const pausedFor = Date.now() - Date.parse(sim.pausedAt)
-      return { ...state, simulation: { ...sim, status: 'running', pausedAt: null, pausedMs: (sim.pausedMs || 0) + pausedFor } }
-    }
-
-    // Back to the depot, not started.
-    case 'sim/reset':
-      return { ...state, simulation: { ...IDLE_CONTROL } }
-
-    case 'sim/stop': {
-      const sim = state.simulation
-      if (sim?.status !== 'running' && sim?.status !== 'paused') return state
-      // Freeze the clock where the truck is now.
-      const frozenAt = sim.status === 'paused' ? sim.pausedAt : now()
-      return { ...state, simulation: { ...sim, status: 'stopped', stoppedAt: frozenAt, pausedAt: null } }
-    }
-
     case 'collection/clear': {
-      const run = currentRun(state)
-      if (!run) return state
+      const run = currentRun(state, p.truckId ?? truckOfStop(state, p.stopId)?.id)
+      if (!run?.results[p.stopId]) return state
       return updateRun(state, run.id, (r) => {
         const results = { ...r.results }
         delete results[p.stopId]
@@ -310,36 +399,46 @@ export function dataReducer(state, action) {
     }
 
     case 'collection/clearAll': {
-      const run = currentRun(state)
+      const run = currentRun(state, p?.truckId)
       if (!run) return state
       return updateRun(state, run.id, (r) => ({ ...r, results: {} }))
     }
 
-    case 'route/addStop': {
-      const stops = state.route.stops
-      const stop = { id: nextId('STP', stops), name: p.name, purok: p.purok, households: p.households, coords: p.coords }
-      // Insert after the chosen stop; never after the end depot.
-      const after = stops.findIndex((s) => s.id === p.afterId)
-      const at = after === -1 || after >= stops.length - 1 ? stops.length - 1 : after + 1
-      return { ...state, route: { ...state.route, stops: [...stops.slice(0, at), stop, ...stops.slice(at)] }, simulation: { ...IDLE_CONTROL } }
+    // ---------- Demo truck (simulated GPS) controls, per truck ----------
+    case 'sim/start': {
+      const truckId = truckIdFor(state, p?.truckId)
+      const status = simulationOf(state, truckId).status
+      // force: restart even if the truck already reached the end of the route.
+      if (!p?.force && (status === 'running' || status === 'paused')) return state
+      return withSession(state, truckId, () => ({ simulation: { ...IDLE_CONTROL, status: 'running', startedAt: now() } }))
     }
 
-    case 'route/removeStop': {
-      const stops = state.route.stops
-      const stop = stops.find((s) => s.id === p.id)
-      // Depots stay, and the route keeps at least one pickup point.
-      if (!stop || !isCollectionStop(stop) || stops.filter(isCollectionStop).length <= 1) return state
-      return { ...state, route: { ...state.route, stops: stops.filter((s) => s.id !== p.id) }, simulation: { ...IDLE_CONTROL } }
+    case 'sim/pause': {
+      const truckId = truckIdFor(state, p?.truckId)
+      const sim = simulationOf(state, truckId)
+      if (sim.status !== 'running') return state
+      return withSession(state, truckId, () => ({ simulation: { ...sim, status: 'paused', pausedAt: now() } }))
     }
 
-    case 'route/moveStop': {
-      const stops = [...state.route.stops]
-      const i = stops.findIndex((s) => s.id === p.id)
-      const j = i + p.dir
-      // Pickup points move only between the start depot (0) and end depot (last).
-      if (i < 1 || i > stops.length - 2 || j < 1 || j > stops.length - 2) return state
-      ;[stops[i], stops[j]] = [stops[j], stops[i]]
-      return { ...state, route: { ...state.route, stops }, simulation: { ...IDLE_CONTROL } }
+    case 'sim/resume': {
+      const truckId = truckIdFor(state, p?.truckId)
+      const sim = simulationOf(state, truckId)
+      if (sim.status !== 'paused') return state
+      const pausedFor = Date.now() - Date.parse(sim.pausedAt)
+      return withSession(state, truckId, () => ({ simulation: { ...sim, status: 'running', pausedAt: null, pausedMs: (sim.pausedMs || 0) + pausedFor } }))
+    }
+
+    // Back to the depot, not started.
+    case 'sim/reset':
+      return resetSim(state, truckIdFor(state, p?.truckId))
+
+    case 'sim/stop': {
+      const truckId = truckIdFor(state, p?.truckId)
+      const sim = simulationOf(state, truckId)
+      if (sim.status !== 'running' && sim.status !== 'paused') return state
+      // Freeze the clock where the truck is now.
+      const frozenAt = sim.status === 'paused' ? sim.pausedAt : now()
+      return withSession(state, truckId, () => ({ simulation: { ...sim, status: 'stopped', stoppedAt: frozenAt, pausedAt: null } }))
     }
 
     case 'notification/add':
@@ -464,7 +563,8 @@ export function dataReducer(state, action) {
         reportedAt: now(),
         driverId: p.driverId ?? null,
         driverName: p.driverName ?? 'Driver',
-        runId: currentRun(state)?.id ?? null,
+        truckId: truckIdFor(state, p.truckId),
+        runId: currentRun(state, truckIdFor(state, p.truckId))?.id ?? null,
         stopId: p.stopId ?? null,
         stopName: p.stopName ?? null,
         issueType: p.issueType ?? 'other',
@@ -491,6 +591,7 @@ export function dataReducer(state, action) {
       }
       if (p.markMissed && p.stopId) {
         next = recordStop(next, {
+          truckId: truckIdFor(state, p.truckId),
           stopId: p.stopId,
           status: 'missed',
           note: `${p.issueLabel} — ${p.description}`,

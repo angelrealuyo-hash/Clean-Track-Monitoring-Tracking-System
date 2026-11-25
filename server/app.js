@@ -7,7 +7,7 @@
 //   POST /api/actions          { type, payload }                    -> new snapshot
 //   GET  /api/events?token=    live "data changed" stream (Server-Sent Events)
 //   GET  /api/admin/email-log  email attempts (admin)
-//   GET  /api/admin/locations  simulated location history (admin)
+//   GET  /api/admin/locations  simulated location history (admin; ?truck= for one truck)
 //   POST /api/admin/reset      restore demo data (admin)
 import express from 'express'
 import { openDatabase } from './db.js'
@@ -139,7 +139,11 @@ export function createApi({ db = openDatabase(), tickMs = 15_000 } = {}) {
 
   // ---------- Admin tools ----------
   api.get('/admin/email-log', requireUser(['admin']), (req, res) => res.json({ config: emailConfig(), entries: emailLog(db) }))
-  api.get('/admin/locations', requireUser(['admin']), (req, res) => res.json({ entries: recentLocations(db, 25) }))
+  // ?truck=TRK-02 limits the history to one truck.
+  api.get('/admin/locations', requireUser(['admin']), (req, res) => {
+    const truck = typeof req.query.truck === 'string' && /^[A-Za-z0-9-]{1,12}$/.test(req.query.truck) ? req.query.truck : null
+    res.json({ entries: recentLocations(db, 25, truck) })
+  })
   api.post('/admin/reset', requireUser(['admin']), (req, res) => {
     service.resetDemo()
     res.json(service.snapshotFor(req.user))

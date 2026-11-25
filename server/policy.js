@@ -8,9 +8,9 @@ import { userKeyOf } from '../src/store/view.js'
 import { normalizePhone } from '../src/utils/validate.js'
 import { reportCategories } from '../src/data/reports.js'
 import {
+  MAX_TRUCKS,
   MIN_TRUCK_YEAR,
   RESERVE_STATUSES,
-  SERVICE_STATUSES,
   allTrucks,
   findTruck,
   isOutOfService,
@@ -18,9 +18,27 @@ import {
   maintenanceTypes,
   maxTruckYear,
   plateKey,
+  statusesForTruck,
   truckDeleteBlock,
   truckIdKey,
 } from '../src/data/truck.js'
+import {
+  activeRunIdOf,
+  isMoving,
+  primaryTruckId,
+  purokTakenBy,
+  rosterTruckOfDriver,
+  routeById,
+  routeOfStop,
+  routeOfTruck,
+  routesOf,
+  simulationOf,
+  truckById,
+  truckForPurok,
+  truckOfDriver,
+  truckOfRoute,
+  truckOfStop,
+} from '../src/store/fleet.js'
 import { COLLECTION, exceptionKinds, exceptionOn, isCollectionDate, isCollectionDay, isPickupDate, scheduleLabel } from '../src/data/schedule.js'
 import { barangay } from '../src/data/barangay.js'
 import { feedbackReasons } from '../src/data/collectionFeedback.js'
@@ -91,9 +109,9 @@ const profilePhoto = (v, current) => {
 
 const ROLE_ACTIONS = {
   admin: new Set([
-    'truck/add', 'truck/update', 'truck/delete', 'truck/setService', 'truck/assignDriver', 'truck/logMaintenance',
+    'truck/add', 'truck/update', 'truck/delete', 'truck/setService', 'truck/assignRoute', 'truck/assignDriver', 'truck/logMaintenance',
     'driver/add', 'driver/update', 'driver/delete',
-    'route/update', 'route/updateStop', 'route/addStop', 'route/removeStop', 'route/moveStop',
+    'route/add', 'route/delete', 'route/update', 'route/updateStop', 'route/addStop', 'route/removeStop', 'route/moveStop',
     'schedule/update',
     'run/start', 'run/end', 'collection/mark', 'collection/clear', 'collection/clearAll',
     'report/update', 'broadcast/add', 'settings/update',
@@ -110,7 +128,8 @@ const ROLE_ACTIONS = {
   resident: new Set(['report/add', 'feedback/submit', 'resident/update', 'notification/markRead', 'notification/markAllRead']),
 }
 
-const runActive = (state) => Boolean(state.activeRunId)
+// Is this truck's route in progress?
+const runActiveOn = (state, truckId) => Boolean(truckId && activeRunIdOf(state, truckId))
 
 const bool = (v, label) => {
   if (typeof v !== 'boolean') fail(`${label} must be Active or Inactive.`)
@@ -118,11 +137,12 @@ const bool = (v, label) => {
 }
 
 // ---------- Truck personnel (limits in src/data/personnel.js) ----------
-// Works out a person's roster place { truckId, shift } and checks the shift
-// limit whenever they would take a slot they do not already hold. Editing a
-// name, number or picture never re-checks the limit, and the person's own
-// current slot is left out of the count. Inactive people take no slot.
-function rosterPlace(state, { type, key, current, shiftIn, active, required }) {
+// Works out a person's roster place { truckId, shift } and checks that truck's
+// shift limit whenever they would take a slot they do not already hold.
+// Editing a name, number or picture never re-checks the limit, and the
+// person's own current slot is left out of the count. Inactive people take no
+// slot. Every truck has its own Morning and Afternoon Shift.
+function rosterPlace(state, { type, key, current, shiftIn, active, required, truckId }) {
   let shift
   if (shiftIn === undefined) {
     if (required) fail('Choose the Morning or Afternoon shift.')
@@ -131,11 +151,30 @@ function rosterPlace(state, { type, key, current, shiftIn, active, required }) {
     if (required) fail('Choose the Morning or Afternoon shift.')
     shift = null
   } else shift = oneOf(shiftIn, SHIFT_KEYS, 'Shift')
-  const place = { truckId: shift ? state.truck.id : null, shift }
-  const takesSlot = holdsSlot({ ...place, active }, state.truck.id)
-  const keepsSameSlot = current && holdsSlot(current, state.truck.id) && current.shift === shift
-  if (takesSlot && !keepsSameSlot && !hasRoom(state, type, shift, { excludeKey: key })) fail(fullMessage(type, shift), 409)
+  const place = { truckId: shift ? truckId : null, shift }
+  const takesSlot = holdsSlot({ ...place, active }, truckId)
+  const keepsSameSlot = current && holdsSlot(current, truckId) && current.shift === shift
+  if (takesSlot && !keepsSameSlot && !hasRoom(state, type, shift, { excludeKey: key, truckId })) fail(fullMessage(type, shift), 409)
   return place
+}
+
+// The truck a person is placed on: the one sent (admin), else their current
+// truck, else the first truck with a route (older screens send none).
+function rosterTruckId(state, truckIdIn, current) {
+  if (truckIdIn !== undefined && truckIdIn !== null && truckIdIn !== '') {
+    if (!truckById(state, truckIdIn)) fail('That truck does not exist.', 404)
+    return truckIdIn
+  }
+  return current?.truckId ?? primaryTruckId(state)
+}
+
+// One purok, one truck: a purok's pickup points stay on one route.
+function checkPurokFree(state, purok, routeId) {
+  const other = purokTakenBy(state, purok, routeId)
+  if (other) {
+    const owner = truckOfRoute(state, other.id)
+    fail(`${purok} is already served by ${other.name}${owner ? ` (${owner.id})` : ''}. One purok is served by one truck.`, 409)
+  }
 }
 
 // The same person may not be listed twice (e.g. a form sent twice).
@@ -144,7 +183,6 @@ function checkNotListed(state, name, key) {
 }
 
 // ---------- Trucks ----------
-const MAX_TRUCKS = 20
 const isoDate = (v, label) => {
   const s = String(v ?? '')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(`${s}T00:00`))) fail(`${label} is not a valid date.`)
@@ -191,9 +229,19 @@ export function prepareAction(state, user, action) {
   const p = action.payload ?? {}
   const effects = []
   const out = (payload) => ({ action: { type: action.type, payload }, effects })
-  const driverIsAssigned = user.role === 'driver' && state.truck.driverId === user.refId
-  const requireAssignedDriver = () => {
-    if (user.role === 'driver' && !driverIsAssigned) fail(`You are not assigned to ${state.truck.id} today.`, 403)
+  // The truck an action is about. A driver only ever works on the truck they
+  // are on duty for (whatever truck the request names); the office may name
+  // any truck, and older screens that name none mean the first truck with a route.
+  const truckFor = (truckIdIn) => {
+    if (user.role === 'driver') {
+      const own = truckOfDriver(state, user.refId)
+      if (!own) fail(`You are not assigned to ${rosterTruckOfDriver(state, user.refId)?.id ?? 'a truck'} today.`, 403)
+      if (truckIdIn !== undefined && truckIdIn !== null && truckIdIn !== own.id) fail('You can only work on your own truck.', 403)
+      return own
+    }
+    const t = truckById(state, truckIdIn ?? primaryTruckId(state))
+    if (!t) fail('That truck does not exist.', 404)
+    return t
   }
 
   switch (action.type) {
@@ -212,12 +260,11 @@ export function prepareAction(state, user, action) {
       })
     }
     case 'truck/update': {
-      // No id: the service truck (older screens and the API tests send none).
-      const target = p.id === undefined ? state.truck : findTruck(state, p.id)
+      // No id: the first truck with a route (older screens and API tests send none).
+      const target = p.id === undefined ? truckById(state, primaryTruckId(state)) : findTruck(state, p.id)
       if (!target) fail('That truck does not exist.', 404)
-      const isService = target.id === state.truck.id
-      const patch = truckDetails(state, p, target, isService ? SERVICE_STATUSES : RESERVE_STATUSES)
-      if (isService && isOutOfService(patch.status) && runActive(state))
+      const patch = truckDetails(state, p, target, statusesForTruck(target))
+      if (isOutOfService(patch.status) && runActiveOn(state, target.id))
         fail(`End the current route before marking the truck ${outOfServiceWord(patch.status)}.`, 409)
       return out({ id: target.id, ...patch })
     }
@@ -228,36 +275,57 @@ export function prepareAction(state, user, action) {
       if (block) fail(block, 409)
       return out({ id: target.id })
     }
+    // Gives a truck its own route, or takes it away (routeId null).
+    case 'truck/assignRoute': {
+      const target = findTruck(state, p.id)
+      if (!target) fail('That truck does not exist.', 404)
+      const routeId = p.routeId === undefined || p.routeId === '' ? null : p.routeId
+      if (routeId !== null && !routeById(state, routeId)) fail('That route does not exist.', 404)
+      if (routeId === target.routeId) return out({ id: target.id, routeId })
+      const owner = routeId && truckOfRoute(state, routeId)
+      if (owner) fail(`${routeById(state, routeId).name} is already assigned to ${owner.id}. Remove it from ${owner.id} first.`, 409)
+      if (runActiveOn(state, target.id)) fail(`${target.id} has a route in progress. End it before changing its route.`, 409)
+      if (isMoving(simulationOf(state, target.id))) fail(`Stop ${target.id}'s simulated truck (Live Tracking) before changing its route.`, 409)
+      return out({ id: target.id, routeId })
+    }
+    // Older Truck Management screen: the truck takes over the first route
+    // (with its driver on duty and shift roster). Replaced by Assign Route.
     case 'truck/setService': {
       const target = findTruck(state, p.id)
       if (!target) fail('That truck does not exist.', 404)
-      if (target.id === state.truck.id) fail(`${target.id} is already the service truck.`, 409)
-      if (runActive(state)) fail('A route is in progress. End it before changing the service truck.', 409)
-      if (state.simulation?.status === 'running' || state.simulation?.status === 'paused')
+      const from = truckById(state, primaryTruckId(state))
+      if (target.id === from?.id) fail(`${target.id} is already the service truck.`, 409)
+      if (target.routeId) fail(`${target.id} already has its own route.`, 409)
+      if (runActiveOn(state, from?.id)) fail('A route is in progress. End it before changing the service truck.', 409)
+      if (isMoving(simulationOf(state, from?.id)) || isMoving(simulationOf(state, target.id)))
         fail('Stop the simulated truck (Live Tracking) before changing the service truck.', 409)
       if (target.status !== 'active') fail(`${target.id} is ${truckStatusWord(target.status)}. Set it to Active first.`, 409)
       return out({ id: target.id })
     }
+    // The driver on duty for one truck. They must be on that truck's shift roster.
     case 'truck/assignDriver': {
+      const target = truckFor(p.truckId)
       const driverId = p.driverId ?? null
       const driver = driverId === null ? null : collectorsOf(state).find((c) => c.key === `driver:${driverId}`)
       if (driverId !== null && !driver) fail('That driver does not exist.')
-      if (runActive(state) && driverId !== state.truck.driverId) fail('A route is in progress. End it before changing the driver.', 409)
-      if (driver && !holdsSlot(driver, state.truck.id))
-        fail(`${driver.name} is not an active ${state.truck.id} driver. Put them on the Morning or Afternoon shift first (Collector's Management).`, 409)
-      return out({ driverId })
+      if (runActiveOn(state, target.id) && driverId !== target.driverId) fail('A route is in progress. End it before changing the driver.', 409)
+      const elsewhere = driverId && truckOfDriver(state, driverId)
+      if (elsewhere && elsewhere.id !== target.id && runActiveOn(state, elsewhere.id))
+        fail(`${driver.name} is driving ${elsewhere.id} on a route in progress. End that route first.`, 409)
+      if (driver && !holdsSlot(driver, target.id))
+        fail(`${driver.name} is not an active ${target.id} driver. Put them on the Morning or Afternoon shift first (Collector's Management).`, 409)
+      return out({ truckId: target.id, driverId })
     }
     case 'truck/logMaintenance': {
-      const target = p.truckId === undefined ? state.truck : findTruck(state, p.truckId)
+      const target = p.truckId === undefined ? truckById(state, primaryTruckId(state)) : findTruck(state, p.truckId)
       if (!target) fail('That truck does not exist.', 404)
-      const isService = target.id === state.truck.id
       const km = int(p.odometerKm, 'Odometer', target.odometerKm ?? 0, 2_000_000)
       const date = str(p.date, 'Service date', { max: 10 })
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail('Service date is not valid.')
       const next = p.nextServiceDate ? String(p.nextServiceDate) : ''
       if (next && (!/^\d{4}-\d{2}-\d{2}$/.test(next) || next <= date)) fail('Next service must be after the service date.')
-      const newStatus = oneOf(p.newStatus, isService ? SERVICE_STATUSES : RESERVE_STATUSES, 'Status')
-      if (isService && isOutOfService(newStatus) && runActive(state))
+      const newStatus = oneOf(p.newStatus, statusesForTruck(target), 'Status')
+      if (isOutOfService(newStatus) && runActiveOn(state, target.id))
         fail(`End the current route before marking the truck ${outOfServiceWord(newStatus)}.`, 409)
       return out({
         truckId: target.id,
@@ -280,7 +348,7 @@ export function prepareAction(state, user, action) {
         name,
         phone: phone(p.phone),
         license: str(p.license, 'License type', { max: 60 }),
-        ...rosterPlace(state, { type: 'driver', key: null, current: null, shiftIn: p.shift, active, required: true }),
+        ...rosterPlace(state, { type: 'driver', key: null, current: null, shiftIn: p.shift, active, required: true, truckId: rosterTruckId(state, p.truckId, null) }),
         active,
         status: oneOf(p.status ?? 'standby', ['on-shift', 'standby', 'off-duty'], 'Availability'),
         ...(e ? { email: e } : {}),
@@ -311,12 +379,15 @@ export function prepareAction(state, user, action) {
       }
       if ('phone' in patchIn) patch.phone = phone(patchIn.phone)
       if ('license' in patchIn) patch.license = str(patchIn.license, 'License type', { max: 60 })
-      if ('shift' in patchIn || 'active' in patchIn) {
+      // The truck the driver is driving right now (driver on duty), if any.
+      const driving = truckOfDriver(state, p.id)
+      if ('shift' in patchIn || 'active' in patchIn || 'truckId' in patchIn) {
         const current = collectorsOf(state).find((c) => c.key === key)
         const active = 'active' in patchIn ? bool(patchIn.active, 'Status') : current.active
-        Object.assign(patch, rosterPlace(state, { type: 'driver', key, current, shiftIn: patchIn.shift, active }), { active })
+        const truckId = rosterTruckId(state, patchIn.truckId, current)
+        Object.assign(patch, rosterPlace(state, { type: 'driver', key, current, shiftIn: patchIn.shift, active, truckId }), { active })
         // The driver on duty leaves the truck: only when no route is running.
-        if (state.truck.driverId === p.id && !holdsSlot(patch, state.truck.id) && runActive(state))
+        if (driving && !holdsSlot(patch, driving.id) && runActiveOn(state, driving.id))
           fail('This driver has a route in progress. End the route first.', 409)
       }
       if ('photo' in patchIn) patch.photo = profilePhoto(patchIn.photo, target.photo ?? null)
@@ -327,7 +398,7 @@ export function prepareAction(state, user, action) {
       }
       if ('status' in patchIn) {
         patch.status = oneOf(patchIn.status, ['on-shift', 'standby', 'off-duty'], 'Availability')
-        if (patch.status === 'off-duty' && runActive(state) && state.truck.driverId === p.id && user.role === 'admin')
+        if (patch.status === 'off-duty' && runActiveOn(state, driving?.id) && user.role === 'admin')
           fail('This driver has a route in progress. End the route first.', 409)
       }
       if (user.role === 'admin' && 'account' in patchIn) {
@@ -342,25 +413,55 @@ export function prepareAction(state, user, action) {
     }
     case 'driver/delete': {
       if (!state.drivers.some((d) => d.id === p.id)) fail('That driver does not exist.', 404)
-      if (runActive(state) && state.truck.driverId === p.id) fail('This driver has a route in progress. End the route first.', 409)
+      if (runActiveOn(state, truckOfDriver(state, p.id)?.id)) fail('This driver has a route in progress. End the route first.', 409)
       effects.push({ type: 'disableDriverAccount', driverId: p.id })
       return out({ id: p.id })
     }
 
-    // ---------- Route & schedule ----------
+    // ---------- Routes & schedule ----------
+    // Each truck has its own route. One purok, one truck: a purok's pickup
+    // points may be on one route only (depots are not pickup points).
+    case 'route/add': {
+      const name = str(p.name, 'Route name', { min: 3, max: 80 })
+      if (routesOf(state).some((r) => sameName(r.name, name))) fail(`There is already a route called ${name}.`, 409)
+      const startTime = p.startTime ? str(p.startTime, 'Start time', { max: 8 }) : ''
+      if (startTime && !time12.test(startTime)) fail('Start time is not valid.')
+      // The depot (start and end of the route): the one sent, else the first route's depot.
+      const depotIn = p.depot ?? routesOf(state)[0]?.stops[0]?.coords ?? barangay.center
+      if (!Array.isArray(depotIn) || depotIn.length !== 2 || !depotIn.every(Number.isFinite) || Math.abs(depotIn[0]) > 90 || Math.abs(depotIn[1]) > 180)
+        fail('The depot location is not valid.')
+      return out({
+        name,
+        shortName: typeof p.shortName === 'string' ? p.shortName.trim().slice(0, 40) : '',
+        startTime,
+        depot: [Number(depotIn[0].toFixed(6)), Number(depotIn[1].toFixed(6))],
+      })
+    }
+    case 'route/delete': {
+      const route = routeById(state, p.id)
+      if (!route) fail('That route does not exist.', 404)
+      const owner = truckOfRoute(state, route.id)
+      if (owner) fail(`${route.name} is assigned to ${owner.id}. Remove it from the truck first.`, 409)
+      return out({ id: route.id })
+    }
     case 'route/update': {
+      // No routeId: the first truck's route (older screens send none).
+      const route = routeById(state, p.routeId ?? routeOfTruck(state, primaryTruckId(state))?.id ?? routesOf(state)[0]?.id)
+      if (!route) fail('That route does not exist.', 404)
       const start = str(p.startTime, 'Start time', { max: 8 })
       if (!time12.test(start)) fail('Start time is not valid.')
-      return out({ name: str(p.name, 'Route name', { min: 3, max: 80 }), shortName: str(p.shortName, 'Short name', { max: 40 }), startTime: start })
+      return out({ routeId: route.id, name: str(p.name, 'Route name', { min: 3, max: 80 }), shortName: str(p.shortName, 'Short name', { max: 40 }), startTime: start })
     }
     case 'route/updateStop': {
-      const stop = state.route.stops.find((s) => s.id === p.id)
+      const route = routeOfStop(state, p.id)
+      const stop = route?.stops.find((s) => s.id === p.id)
       if (!stop) fail('That stop does not exist.', 404)
       const patchIn = p.patch ?? {}
       const patch = { name: str(patchIn.name, 'Stop name', { min: 3, max: 80 }) }
       if (isCollectionStop(stop)) {
         patch.purok = oneOf(patchIn.purok, barangay.puroks, 'Purok')
         patch.households = int(patchIn.households, 'Households', 1, 500)
+        checkPurokFree(state, patch.purok, route.id)
       }
       return out({ id: p.id, patch })
     }
@@ -368,10 +469,15 @@ export function prepareAction(state, user, action) {
       const coords = p.coords
       if (!Array.isArray(coords) || coords.length !== 2 || !coords.every(Number.isFinite)) fail('Pick the stop location on the map.')
       if (Math.abs(coords[0]) > 90 || Math.abs(coords[1]) > 180) fail('That location is not valid.')
-      if (!state.route.stops.some((s) => s.id === p.afterId)) fail('Choose where the stop goes in the route.')
+      // The stop goes after another stop, which also says which route it is on.
+      const route = routeOfStop(state, p.afterId)
+      if (!route) fail('Choose where the stop goes in the route.')
+      const purok = oneOf(p.purok, barangay.puroks, 'Purok')
+      checkPurokFree(state, purok, route.id)
       return out({
+        routeId: route.id,
         name: str(p.name, 'Stop name', { min: 3, max: 80 }),
-        purok: oneOf(p.purok, barangay.puroks, 'Purok'),
+        purok,
         households: int(p.households, 'Households', 1, 500),
         coords: [Number(coords[0].toFixed(6)), Number(coords[1].toFixed(6))],
         afterId: p.afterId,
@@ -379,7 +485,7 @@ export function prepareAction(state, user, action) {
     }
     case 'route/removeStop':
     case 'route/moveStop':
-      if (!state.route.stops.some((s) => s.id === p.id)) fail('That stop does not exist.', 404)
+      if (!routeOfStop(state, p.id)) fail('That stop does not exist.', 404)
       return out(action.type === 'route/moveStop' ? { id: p.id, dir: p.dir === -1 ? -1 : 1 } : { id: p.id })
     case 'schedule/update': {
       // Regular collection is only on the official days; only their time can change.
@@ -390,35 +496,38 @@ export function prepareAction(state, user, action) {
       return out({ day: p.day, patch: { wasteType: COLLECTION, window } })
     }
 
-    // ---------- Collection runs ----------
+    // ---------- Collection runs (each truck has its own) ----------
     case 'run/start': {
-      requireAssignedDriver()
+      const truck = truckFor(p.truckId)
       if (user.role === 'driver' && !isCollectionDay(todayName()))
         fail(`No collection today. Regular routes run on ${scheduleLabel} only.`, 409)
       if (user.role === 'driver' && !isPickupDate(todayISO(), state.scheduleExceptions))
         fail(`No collection today: ${exceptionOn(todayISO(), state.scheduleExceptions).reason}.`, 409)
-      if (isOutOfService(state.truck.status))
-        fail(`Truck ${state.truck.id} is ${outOfServiceWord(state.truck.status)}. The route cannot start.`, 409)
-      if (!state.route.stops.some(isCollectionStop)) fail('The route has no pickup points.', 409)
-      return out(user.role === 'driver' ? { by: 'driver', driverId: user.refId } : { by: 'admin' })
+      if (isOutOfService(truck.status)) fail(`Truck ${truck.id} is ${outOfServiceWord(truck.status)}. The route cannot start.`, 409)
+      const route = routeOfTruck(state, truck.id)
+      if (!route) fail(`Truck ${truck.id} has no route. Assign a route first.`, 409)
+      if (!route.stops.some(isCollectionStop)) fail('The route has no pickup points.', 409)
+      return out(user.role === 'driver' ? { by: 'driver', driverId: user.refId, truckId: truck.id } : { by: 'admin', truckId: truck.id })
     }
     case 'run/end': {
-      requireAssignedDriver()
+      const truck = truckFor(p.truckId)
       // The driver ends the shift only after every stop is collected; the office may end a route any time.
-      const run = state.runs.find((r) => r.id === state.activeRunId)
+      const run = state.runs.find((r) => r.id === activeRunIdOf(state, truck.id))
       if (user.role === 'driver' && run && !run.stops.every((s) => run.results[s.id]?.status === 'collected'))
         fail('Mark every stop as collected before ending your shift.', 409)
-      return out({})
+      return out({ truckId: truck.id })
     }
     case 'collection/mark': {
-      requireAssignedDriver()
-      const stop = state.route.stops.find((s) => s.id === p.stopId)
-      if (!stop || !isCollectionStop(stop)) fail('That pickup point does not exist.', 404)
+      // The office may record a stop of any truck (the stop says which).
+      const truck = truckFor(p.truckId ?? (user.role === 'driver' ? undefined : truckOfStop(state, p.stopId)?.id))
+      const stop = routeOfTruck(state, truck.id)?.stops.find((s) => s.id === p.stopId)
+      if (!stop || !isCollectionStop(stop)) fail(`That pickup point is not on ${truck.id}'s route.`, 404)
       const status = oneOf(p.status, ['collected', 'missed'], 'Status')
       const note = typeof p.note === 'string' ? p.note.trim().slice(0, 300) : ''
       if (status === 'missed' && note.length < 3) fail('Give a reason when a stop is missed.')
       const driver = state.drivers.find((d) => d.id === user.refId)
       return out({
+        truckId: truck.id,
         stopId: p.stopId,
         status,
         note,
@@ -429,24 +538,25 @@ export function prepareAction(state, user, action) {
       })
     }
     case 'collection/clear': {
-      requireAssignedDriver()
-      const rec = currentRun(state)?.results[p.stopId]
+      const truck = truckFor(p.truckId ?? (user.role === 'driver' ? undefined : truckOfStop(state, p.stopId)?.id))
+      const rec = currentRun(state, truck.id)?.results[p.stopId]
       if (!rec) fail('There is no record to undo.', 404)
       if (user.role === 'driver' && rec.by !== 'driver') fail('Only the office can change records made by the office.', 403)
-      return out({ stopId: p.stopId })
+      return out({ truckId: truck.id, stopId: p.stopId })
     }
     case 'collection/clearAll':
-      return out({})
+      return out({ truckId: truckFor(p.truckId).id })
     case 'driver/reportIssue': {
-      requireAssignedDriver()
+      const truck = truckFor(p.truckId)
       // The stop is optional: a problem can happen on the road or at the depot.
-      const stop = p.stopId ? state.route.stops.find((s) => s.id === p.stopId) : null
+      const stop = p.stopId ? routeOfTruck(state, truck.id)?.stops.find((s) => s.id === p.stopId) : null
       if (p.stopId && !stop) fail('That stop does not exist.', 404)
-      const driver = state.drivers.find((d) => d.id === user.refId)
+      const driver = state.drivers.find((d) => d.id === (user.role === 'driver' ? user.refId : truck.driverId))
       return out({
+        truckId: truck.id,
         stopId: stop?.id ?? null,
         stopName: stop?.name ?? null,
-        driverId: user.role === 'driver' ? user.refId : state.truck.driverId,
+        driverId: user.role === 'driver' ? user.refId : truck.driverId,
         issueType: str(p.issueType ?? 'other', 'Issue type', { max: 30 }),
         issueLabel: str(p.issueLabel, 'Issue type', { max: 60 }),
         description: str(p.description, 'Description', { min: 10, max: 250 }),
@@ -507,7 +617,7 @@ export function prepareAction(state, user, action) {
         // Position on the crew (Garbage Collector, Helper / Loader, ...).
         role: oneOf(f.role ?? (editing ? current.role : crewRoles[0]), crewRoles, 'Position'),
         phone: f.phone && String(f.phone).trim() ? phone(f.phone) : '',
-        ...rosterPlace(state, { type: 'crew', key, current: was, shiftIn: f.shift, active: status === 'active', required: !editing }),
+        ...rosterPlace(state, { type: 'crew', key, current: was, shiftIn: f.shift, active: status === 'active', required: !editing, truckId: rosterTruckId(state, f.truckId, was) }),
         status,
         ...('photo' in f ? { photo: profilePhoto(f.photo, current?.photo ?? null) } : editing ? {} : { photo: null }),
       }
@@ -551,7 +661,11 @@ export function prepareAction(state, user, action) {
       // the resident could not put the garbage out.
       if (truckPassed === false && disposed === true) fail('Answer is not valid.')
       const date = todayISO()
-      const run = state.runs.find((r) => r.date === date && r.id === state.activeRunId) ?? state.runs.find((r) => r.date === date)
+      // The run of the truck serving the resident's purok (one purok, one truck).
+      const purokTruck = truckForPurok(state, resident.purok)
+      const run = purokTruck
+        ? (state.runs.find((r) => r.date === date && r.id === activeRunIdOf(state, purokTruck.id)) ?? state.runs.find((r) => r.date === date && r.truckId === purokTruck.id))
+        : null
       const reasonDef = feedbackReasons.find((x) => x.id === reason)
       const category = reasonDef?.report ? reportCategories.find((c) => c.id === reasonDef.report) : null
       return out({
@@ -667,9 +781,11 @@ export function prepareAction(state, user, action) {
     case 'sim/pause':
     case 'sim/resume':
     case 'sim/stop':
-    case 'sim/reset':
-      if (user.role === 'driver') requireAssignedDriver()
-      return out(action.type === 'sim/start' ? { force: Boolean(p.force) } : {})
+    case 'sim/reset': {
+      // Each truck has its own simulated GPS; a driver controls only their own.
+      const truck = truckFor(p.truckId)
+      return out(action.type === 'sim/start' ? { truckId: truck.id, force: Boolean(p.force) } : { truckId: truck.id })
+    }
 
     default:
       return fail('Unknown action.')

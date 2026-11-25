@@ -4,6 +4,8 @@
 // transaction, which keeps every save all-or-nothing.
 import { transaction } from './db.js'
 import { normalizeSchedule } from '../src/data/schedule.js'
+import { IDLE_CONTROL } from '../src/services/trackingSimulation.js'
+import { primaryTruckId, sessionOf, withLegacy } from '../src/store/fleet.js'
 
 const json = (v) => (v === undefined || v === null ? null : JSON.stringify(v))
 const parse = (v, fallback = null) => (v ? JSON.parse(v) : fallback)
@@ -17,9 +19,7 @@ export function loadState(db) {
   const meta = Object.fromEntries(db.prepare('SELECT key, value FROM meta').all().map((r) => [r.key, r.value]))
   const settings = Object.fromEntries(db.prepare('SELECT key, value_json FROM settings').all().map((r) => [r.key, JSON.parse(r.value_json)]))
 
-  // Every registered truck. The service truck is the one on the route
-  // (route_id set); the others are reserve trucks. Older databases have a
-  // single truck, which is the service truck.
+  // Every registered truck, each with its own route (route_id) and driver on duty.
   const maintenanceOf = db.prepare('SELECT * FROM maintenance_records WHERE truck_id = ? ORDER BY seq')
   const truckRows = db.prepare('SELECT * FROM trucks ORDER BY rowid').all().map((t) => ({
     id: t.id,
@@ -40,8 +40,7 @@ export function loadState(db) {
     })),
     nextServiceDate: t.next_service_date,
   }))
-  const truck = truckRows.find((t) => t.routeId) ?? truckRows[0] ?? null
-  const reserveTrucks = truckRows.filter((t) => t !== truck)
+  const trucks = truckRows
 
   const accounts = db.prepare("SELECT ref_id, active FROM accounts WHERE role = 'driver'").all()
   const accountOf = Object.fromEntries(accounts.map((a) => [a.ref_id, a.active]))
@@ -61,23 +60,37 @@ export function loadState(db) {
     account: d.id in accountOf ? (accountOf[d.id] ? 'active' : 'disabled') : 'none',
   }))
 
-  const r = db.prepare('SELECT * FROM routes LIMIT 1').get()
-  const route = r && {
+  // Every collection route with its stops, in the order they were added.
+  const stopsOf = db.prepare('SELECT * FROM route_stops WHERE route_id = ? ORDER BY seq')
+  const routes = db.prepare('SELECT * FROM routes ORDER BY rowid').all().map((r) => ({
     id: r.id,
     name: r.name,
     shortName: r.short_name,
     coordinatesVerified: bool(r.coordinates_verified),
-    truckId: truck?.id,
-    driverId: truck?.driverId,
     startTime: r.start_time,
-    stops: db.prepare('SELECT * FROM route_stops WHERE route_id = ? ORDER BY seq').all(r.id).map((s) => ({
+    stops: stopsOf.all(r.id).map((s) => ({
       id: s.id,
       name: s.name,
       purok: s.purok,
       coords: [s.lat, s.lng],
       households: s.households,
     })),
-  }
+  }))
+
+  // One session per truck: its demo GPS controls and its route run in progress
+  // (migration 009). A truck without a row is idle.
+  const sessionRows = Object.fromEntries(db.prepare('SELECT * FROM truck_sessions').all().map((x) => [x.truck_id, x]))
+  const sessions = Object.fromEntries(
+    trucks.map((t) => {
+      const x = sessionRows[t.id]
+      return [
+        t.id,
+        x
+          ? { simulation: { status: x.sim_status, startedAt: x.started_at, pausedAt: x.paused_at, stoppedAt: x.stopped_at, pausedMs: x.paused_ms }, activeRunId: x.active_run_id || null }
+          : { simulation: { ...IDLE_CONTROL }, activeRunId: null },
+      ]
+    }),
+  )
 
   // The official days (Mon/Wed/Fri) always apply, whatever older rows say.
   const weeklySchedule = normalizeSchedule(db.prepare('SELECT * FROM schedules ORDER BY seq').all().map((d) => ({ day: d.day, wasteType: d.waste_type, window: d.time_window })))
@@ -127,6 +140,7 @@ export function loadState(db) {
       ...(n.kind ? { kind: n.kind } : {}),
       ...(n.key ? { key: n.key } : {}),
       ...(n.resident_id ? { residentId: n.resident_id } : {}),
+      ...(n.truck_id ? { truckId: n.truck_id } : {}),
       ...(n.link_json ? { link: JSON.parse(n.link_json) } : {}),
       ...(n.photo ? { photo: n.photo } : {}),
       readBy,
@@ -191,6 +205,7 @@ export function loadState(db) {
     driverId: x.driver_id,
     driverName: x.driver_name ?? '',
     runId: x.run_id,
+    truckId: x.truck_id ?? null,
     stopId: x.stop_id,
     stopName: x.stop_name,
     issueType: x.issue_type,
@@ -215,17 +230,11 @@ export function loadState(db) {
 
   const scheduleExceptions = db.prepare('SELECT * FROM schedule_exceptions ORDER BY date').all().map((x) => ({ date: x.date, kind: x.kind, reason: x.reason, createdAt: x.created_at }))
 
-  const sim = db.prepare('SELECT * FROM simulation_state WHERE id = 1').get()
-  const simulation = sim
-    ? { status: sim.status, startedAt: sim.started_at, pausedAt: sim.paused_at, stoppedAt: sim.stopped_at, pausedMs: sim.paused_ms }
-    : { status: 'idle', startedAt: null, pausedAt: null, stoppedAt: null, pausedMs: 0 }
-
-  return {
+  return withLegacy({
     version: Number(meta.data_version ?? 0),
-    truck,
-    reserveTrucks,
+    trucks,
+    routes,
     drivers,
-    route,
     weeklySchedule,
     scheduleExceptions,
     residents,
@@ -236,20 +245,26 @@ export function loadState(db) {
     collectionFeedback,
     driverIssues,
     crew,
-    activeRunId: meta.active_run_id || null,
+    sessions,
     adminPhoto: meta.admin_photo || null,
-    simulation,
     settings,
     savedAt: meta.saved_at ?? null,
-  }
+  })
 }
 
 // Saves the whole data object. Tables are rewritten in one transaction.
+// Only the multi-truck data is saved (trucks, routes, sessions); the
+// single-truck fields older screens read are derived again when loading.
 export function saveState(db, state) {
+  // The first truck with a route is mirrored into the pre-009 single-truck
+  // places (meta.active_run_id, simulation_state), so older code still finds
+  // consistent data after a rollback.
+  const legacyTruckId = primaryTruckId(state)
+  const legacy = legacyTruckId ? sessionOf(state, legacyTruckId) : { simulation: IDLE_CONTROL, activeRunId: null }
   transaction(db, () => {
     const setMeta = db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     setMeta.run('data_version', String((state.version ?? 0) + 1))
-    setMeta.run('active_run_id', state.activeRunId ?? '')
+    setMeta.run('active_run_id', legacy.activeRunId ?? '')
     setMeta.run('saved_at', new Date().toISOString())
     setMeta.run('admin_photo', state.adminPhoto ?? '')
 
@@ -262,11 +277,18 @@ export function saveState(db, state) {
       'INSERT INTO trucks (id, plate_number, type, model, capacity_tons, fuel, odometer_km, driver_id, route_id, status, next_service_date) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
     )
     const addMaint = db.prepare('INSERT INTO maintenance_records (truck_id, seq, date, type, odometer_km, notes) VALUES (?,?,?,?,?,?)')
-    // Service truck first, then reserve trucks (only the service truck keeps a route).
-    for (const t of [state.truck, ...(state.reserveTrucks ?? [])].filter(Boolean)) {
-      const onRoute = t === state.truck
-      addTruck.run(t.id, t.plateNumber, t.type, t.model ?? '', t.capacityTons ?? null, t.fuel ?? null, t.odometerKm ?? null, onRoute ? t.driverId ?? null : null, onRoute ? t.routeId ?? state.route?.id ?? null : null, t.status, t.nextServiceDate ?? null)
+    for (const t of state.trucks) {
+      addTruck.run(t.id, t.plateNumber, t.type, t.model ?? '', t.capacityTons ?? null, t.fuel ?? null, t.odometerKm ?? null, t.driverId ?? null, t.routeId ?? null, t.status, t.nextServiceDate ?? null)
       ;(t.maintenance ?? []).forEach((m, i) => addMaint.run(t.id, i, m.date, m.type, m.odometerKm ?? null, m.notes ?? ''))
+    }
+
+    db.exec('DELETE FROM truck_sessions')
+    const addSession = db.prepare(
+      'INSERT INTO truck_sessions (truck_id, sim_status, started_at, paused_at, stopped_at, paused_ms, active_run_id) VALUES (?,?,?,?,?,?,?)',
+    )
+    for (const t of state.trucks) {
+      const { simulation: c = IDLE_CONTROL, activeRunId } = sessionOf(state, t.id)
+      addSession.run(t.id, c.status ?? 'idle', c.startedAt ?? null, c.pausedAt ?? null, c.stoppedAt ?? null, Math.round(c.pausedMs || 0), activeRunId ?? null)
     }
 
     db.exec('DELETE FROM drivers')
@@ -275,16 +297,12 @@ export function saveState(db, state) {
       addDriver.run(d.id, d.name, d.initials ?? '', d.phone ?? '', d.email ?? null, d.license ?? '', d.shift ?? null, d.status, d.photo ?? null, d.truckId ?? null, d.active === false ? 0 : 1)
 
     db.exec('DELETE FROM routes; DELETE FROM route_stops;')
-    const r = state.route
-    db.prepare('INSERT INTO routes (id, name, short_name, start_time, coordinates_verified) VALUES (?,?,?,?,?)').run(
-      r.id,
-      r.name,
-      r.shortName ?? '',
-      r.startTime ?? '',
-      r.coordinatesVerified ? 1 : 0,
-    )
+    const addRoute = db.prepare('INSERT INTO routes (id, name, short_name, start_time, coordinates_verified) VALUES (?,?,?,?,?)')
     const addStop = db.prepare('INSERT INTO route_stops (id, route_id, seq, name, purok, households, lat, lng) VALUES (?,?,?,?,?,?,?,?)')
-    r.stops.forEach((s, i) => addStop.run(s.id, r.id, i, s.name, s.purok, s.households, s.coords[0], s.coords[1]))
+    for (const r of state.routes) {
+      addRoute.run(r.id, r.name, r.shortName ?? '', r.startTime ?? '', r.coordinatesVerified ? 1 : 0)
+      r.stops.forEach((s, i) => addStop.run(s.id, r.id, i, s.name, s.purok, s.households, s.coords[0], s.coords[1]))
+    }
 
     db.exec('DELETE FROM schedules')
     const addDay = db.prepare('INSERT INTO schedules (day, seq, waste_type, time_window) VALUES (?,?,?,?)')
@@ -313,11 +331,11 @@ export function saveState(db, state) {
 
     db.exec('DELETE FROM notifications; DELETE FROM notification_reads;')
     const addNote = db.prepare(
-      'INSERT INTO notifications (id, audience, priority, title, body, time, zone, kind, key, resident_id, link_json, photo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO notifications (id, audience, priority, title, body, time, zone, kind, key, resident_id, link_json, photo, truck_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
     )
     const addRead = db.prepare('INSERT INTO notification_reads (notification_id, user_key) VALUES (?,?)')
     for (const n of state.notifications) {
-      addNote.run(n.id, n.audience, n.priority ?? 'low', n.title, n.body ?? '', n.time, n.zone ?? null, n.kind ?? null, n.key ?? null, n.residentId ?? null, json(n.link), n.photo ?? null)
+      addNote.run(n.id, n.audience, n.priority ?? 'low', n.title, n.body ?? '', n.time, n.zone ?? null, n.kind ?? null, n.key ?? null, n.residentId ?? null, json(n.link), n.photo ?? null, n.truckId ?? null)
       for (const k of new Set(n.readBy ?? [])) addRead.run(n.id, k)
     }
 
@@ -348,16 +366,16 @@ export function saveState(db, state) {
 
     db.exec('DELETE FROM driver_issues')
     const addIssue = db.prepare(
-      'INSERT INTO driver_issues (id, reported_at, driver_id, driver_name, run_id, stop_id, stop_name, issue_type, issue_label, description, photo, notified_office, marked_missed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO driver_issues (id, reported_at, driver_id, driver_name, run_id, stop_id, stop_name, issue_type, issue_label, description, photo, notified_office, marked_missed, truck_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
     )
     for (const x of state.driverIssues ?? [])
-      addIssue.run(x.id, x.reportedAt, x.driverId ?? null, x.driverName ?? '', x.runId ?? null, x.stopId ?? null, x.stopName ?? null, x.issueType, x.issueLabel, x.description, x.photo ?? null, x.notifiedOffice ? 1 : 0, x.markedMissed ? 1 : 0)
+      addIssue.run(x.id, x.reportedAt, x.driverId ?? null, x.driverName ?? '', x.runId ?? null, x.stopId ?? null, x.stopName ?? null, x.issueType, x.issueLabel, x.description, x.photo ?? null, x.notifiedOffice ? 1 : 0, x.markedMissed ? 1 : 0, x.truckId ?? null)
 
     db.exec('DELETE FROM crew_members')
     const addCrew = db.prepare('INSERT INTO crew_members (id, name, role, phone, truck_id, status, created_at, photo, shift) VALUES (?,?,?,?,?,?,?,?,?)')
     for (const c of state.crew ?? []) addCrew.run(c.id, c.name, c.role, c.phone || null, c.truckId ?? null, c.status, c.createdAt, c.photo ?? null, c.shift ?? null)
 
-    const sim = state.simulation
+    const sim = legacy.simulation ?? IDLE_CONTROL
     db.prepare(
       'INSERT INTO simulation_state (id, status, started_at, paused_at, stopped_at, paused_ms) VALUES (1,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status = excluded.status, started_at = excluded.started_at, paused_at = excluded.paused_at, stopped_at = excluded.stopped_at, paused_ms = excluded.paused_ms',
     ).run(sim.status, sim.startedAt ?? null, sim.pausedAt ?? null, sim.stoppedAt ?? null, Math.round(sim.pausedMs || 0))
@@ -398,8 +416,8 @@ export function updateAccount(db, role, refId, fields) {
 }
 
 // ---------- Location history (simulated) ----------
-export function logLocation(db, { lat, lng, status, runId, event }) {
-  db.prepare('INSERT INTO location_history (recorded_at, lat, lng, status, source, run_id, event) VALUES (?,?,?,?,?,?,?)').run(
+export function logLocation(db, { lat, lng, status, runId, event, truckId }) {
+  db.prepare('INSERT INTO location_history (recorded_at, lat, lng, status, source, run_id, event, truck_id) VALUES (?,?,?,?,?,?,?,?)').run(
     new Date().toISOString(),
     lat,
     lng,
@@ -407,9 +425,12 @@ export function logLocation(db, { lat, lng, status, runId, event }) {
     'SIMULATED',
     runId ?? null,
     event ?? null,
+    truckId ?? null,
   )
 }
 
-export function recentLocations(db, limit = 20) {
+// Newest first; optionally for one truck.
+export function recentLocations(db, limit = 20, truckId = null) {
+  if (truckId) return db.prepare('SELECT * FROM location_history WHERE truck_id = ? ORDER BY id DESC LIMIT ?').all(truckId, limit)
   return db.prepare('SELECT * FROM location_history ORDER BY id DESC LIMIT ?').all(limit)
 }

@@ -128,7 +128,8 @@ test('only the admin can add, edit or delete trucks', async () => {
     assert.equal((await act(token, 'truck/setService', { id: 'TRK-02' })).status, 403)
   }
   const ds = await state(drv)
-  assert.equal(ds.reserveTrucks, undefined, 'drivers only get the service truck')
+  assert.deepEqual(ds.trucks.map((t) => t.id), ['TRK-01'], 'drivers only get their own truck')
+  assert.deepEqual(ds.reserveTrucks, [], 'no other trucks in the driver view')
 })
 
 test('edit a reserve truck; status changes; plate stays unique', async () => {

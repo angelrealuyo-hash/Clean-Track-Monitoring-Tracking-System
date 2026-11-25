@@ -1,7 +1,6 @@
-// The barangay's service truck: the one that runs the collection route, shows on
-// Live Tracking and is driven by the shift drivers. More trucks can be added in
-// Truck Management; they are kept as reserve trucks (see `reserveTrucks` in the
-// store) until the admin makes one the service truck.
+// The barangay's garbage trucks. Each truck can have its own route, driver on
+// duty, shift crew and demo GPS (see src/store/fleet.js). This first truck is
+// the demo data; more are added in Truck Management.
 export const truck = {
   id: 'TRK-01',
   plateNumber: 'ABC-1024',
@@ -35,19 +34,25 @@ export const maintenanceTypes = [
 export const vehicleTypes = ['Mini Compactor', 'Dump Truck', 'Utility Flatbed']
 export const fuelTypes = ['Diesel Euro-4', 'Diesel Euro-2', 'Gasoline', 'Electric']
 
-// ---------- Fleet (service truck + reserve trucks) ----------
-// The service truck may also be Delayed or on Standby while it runs the route.
-// Reserve trucks are only Active (ready), Inactive or Under maintenance.
+// ---------- Fleet ----------
+// No fixed number of trucks (the barangay reference has about six); this is
+// only a safety limit against runaway entries.
+export const MAX_TRUCKS = 50
+
+// A truck with a route may also be Delayed or on Standby while it runs it.
+// A truck without a route is only Active (ready), Inactive or Under maintenance.
 export const RESERVE_STATUSES = ['active', 'inactive', 'maintenance']
 export const SERVICE_STATUSES = ['active', 'delayed', 'standby', 'inactive', 'maintenance']
+export const statusesForTruck = (t) => (t?.routeId ? SERVICE_STATUSES : RESERVE_STATUSES)
 
-// A truck in these states cannot run the route.
+// A truck in these states cannot run its route.
 export const isOutOfService = (status) => status === 'maintenance' || status === 'inactive'
 
-/** Every registered truck, service truck first. */
-export const allTrucks = (state) => [state.truck, ...(state.reserveTrucks ?? [])].filter(Boolean)
+/** Every registered truck. (Older data without `trucks`: the truck and reserve trucks.) */
+export const allTrucks = (state) => state.trucks ?? [state.truck, ...(state.reserveTrucks ?? [])].filter(Boolean)
 export const findTruck = (state, id) => allTrucks(state).find((t) => t.id === id) ?? null
-export const isServiceTruck = (state, id) => state.truck?.id === id
+/** Does this truck have a route? */
+export const isServiceTruck = (state, id) => Boolean(findTruck(state, id)?.routeId)
 
 // "abc 1024" and "ABC-1024" are the same plate.
 export const plateKey = (plate) => String(plate ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -73,7 +78,8 @@ export function nextTruckId(trucks) {
 // Why a truck may not be deleted (null = it may). The server refuses with the
 // same reason; Truck Management shows it on the disabled Delete button.
 export function truckDeleteBlock(state, t) {
-  if (t.id === state.truck?.id) return `${t.id} is the service truck on the route. Make another truck the service truck first.`
+  if (t.routeId) return `${t.id} is the service truck on a route. Assign the route to another truck first.`
+  if (state.sessions?.[t.id]?.activeRunId) return `${t.id} has a route in progress. End it first.`
   const people = [...(state.drivers ?? []), ...(state.crew ?? [])].filter((x) => x.truckId === t.id).length
   if (people) return `${t.id} still has ${people} collector(s) assigned. Move them first.`
   const runs = (state.runs ?? []).filter((r) => r.truckId === t.id).length

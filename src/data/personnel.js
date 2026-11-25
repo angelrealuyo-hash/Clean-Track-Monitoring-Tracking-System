@@ -1,11 +1,14 @@
-// Truck 1 personnel rules, shared by the screens and the server (server/policy.js).
+// Truck personnel rules, shared by the screens and the server (server/policy.js).
 //
-// Each shift on the truck has 1 Driver and 3 Crew Members, so the truck has at
-// most 2 Drivers + 6 Crew Members = 8 people.
+// Each truck has its own Morning and Afternoon Shift. Each shift on a truck has
+// 1 Driver and 3 Crew Members, so each truck has at most 2 Drivers + 6 Crew
+// Members = 8 people (the database enforces the same, per truck: migration 007).
 //
 // Capacity rule: only ACTIVE people assigned to the truck and a shift take a
 // slot. Marking someone Inactive frees their slot (they keep their shift so it
 // is shown, but they need a free slot again to become Active).
+
+import { primaryTruckId } from '../store/fleet.js'
 
 export const SHIFTS = {
   morning: { label: 'Morning Shift', short: 'Morning', hours: '06:00 AM - 02:00 PM' },
@@ -40,12 +43,14 @@ export function collectorsOf(state) {
 /** True when this person holds a slot on the truck. */
 export const holdsSlot = (p, truckId) => p.active && p.truckId === truckId && SHIFTS[p.shift] !== undefined
 
+// Without a truckId: the truck the screen shows (older screens), else the first truck with a route.
+const defaultTruckId = (state) => state.truck?.id ?? primaryTruckId(state)
+
 /**
- * Slot counts for the truck. `excludeKey` ("driver:DRV-01" / "crew:CRW-01")
+ * Slot counts for one truck. `excludeKey` ("driver:DRV-01" / "crew:CRW-01")
  * leaves one person out, so an edit is checked as if they had left.
  */
-export function capacityOf(state, { excludeKey = null } = {}) {
-  const truckId = state.truck?.id
+export function capacityOf(state, { excludeKey = null, truckId = defaultTruckId(state) } = {}) {
   const counts = Object.fromEntries(SHIFT_KEYS.map((s) => [s, { driver: 0, crew: 0 }]))
   for (const p of collectorsOf(state)) if (p.key !== excludeKey && holdsSlot(p, truckId)) counts[p.shift][p.type] += 1
   const total = (type) => SHIFT_KEYS.reduce((n, s) => n + counts[s][type], 0)
@@ -59,9 +64,9 @@ export function capacityOf(state, { excludeKey = null } = {}) {
 }
 
 /** Is there a free slot for this role on this shift? */
-export function hasRoom(state, type, shift, { excludeKey = null } = {}) {
+export function hasRoom(state, type, shift, { excludeKey = null, truckId = defaultTruckId(state) } = {}) {
   if (!SHIFTS[shift] || !LIMITS[type]) return false
-  return capacityOf(state, { excludeKey }).shifts[shift][type] < LIMITS[type]
+  return capacityOf(state, { excludeKey, truckId }).shifts[shift][type] < LIMITS[type]
 }
 
 /** Plain message for a full slot, with the count, e.g. "Morning Shift Drivers: 1/1". */

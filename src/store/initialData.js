@@ -8,6 +8,7 @@ import { reports } from '../data/reports.js'
 import { notifications, residentBroadcasts } from '../data/notifications.js'
 import { demoUsers } from '../data/users.js'
 import { IDLE_CONTROL } from '../services/trackingSimulation.js'
+import { withLegacy } from './fleet.js'
 
 // Bump when the saved shape changes; older saved data is replaced.
 export const DATA_VERSION = 3
@@ -30,14 +31,16 @@ const clone = (v) => structuredClone(v)
 export const defaultResidentPrefs = { email: true, push: true, scheduleReminders: true, truckNearby: true }
 
 export function createInitialData() {
-  return {
+  // The demo route's truck and driver come from the truck record, not the route.
+  const { truckId: _truck, driverId: _driver, ...demoRoute } = clone(route)
+  return withLegacy({
     version: DATA_VERSION,
-    truck: clone(truck),
-    // Other registered trucks (added in Truck Management). Only the service
-    // truck above runs the route; any of these can be made the service truck.
-    reserveTrucks: [],
+    // Every registered truck. Each can have its own route, driver on duty and
+    // crew (see src/store/fleet.js); trucks added later start with none.
+    trucks: [clone(truck)],
     drivers: clone(drivers),
-    route: clone(route),
+    // Every collection route. One purok's pickup points are on one route only.
+    routes: [demoRoute],
     weeklySchedule: clone(weeklySchedule),
     // Holidays / suspended pickup dates (none until the admin adds them).
     scheduleExceptions: [],
@@ -74,10 +77,10 @@ export function createInitialData() {
     driverIssues: [],
     // Truck crew members besides the driver (Admin → Crew Management).
     crew: [],
-    activeRunId: null,
-    // Demo truck controls (the position is calculated from these + the clock).
-    simulation: { ...IDLE_CONTROL },
+    // One entry per truck: its demo GPS controls (the position is calculated
+    // from these + the clock) and its route run in progress.
+    sessions: { [truck.id]: { simulation: { ...IDLE_CONTROL }, activeRunId: null } },
     settings: { ...defaultSettings },
     savedAt: null,
-  }
+  })
 }

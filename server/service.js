@@ -4,7 +4,8 @@
 import { dataReducer, nextId, currentRun } from '../src/store/dataReducer.js'
 import { createInitialData } from '../src/store/initialData.js'
 import { viewFor } from '../src/store/view.js'
-import { computeSimulation, isCollectionStop } from '../src/services/trackingSimulation.js'
+import { computeSimulation, isCollectionStop, validateRoute } from '../src/services/trackingSimulation.js'
+import { activeRunIdOf, primaryTruckId, routeOfTruck, simulationOf, trucksOf } from '../src/store/fleet.js'
 import { isCollectionDay, scheduleLabel } from '../src/data/schedule.js'
 import { isResidentPickupDate } from '../src/resident/data/phHolidays.js'
 import { storeActionImage, removeUnusedImages } from './uploads.js'
@@ -140,9 +141,17 @@ export function createService(db) {
     }
   }
 
-  function logTruck(next, event) {
-    const sim = computeSimulation({ route: next.route, control: next.simulation, results: currentRun(next)?.results ?? {}, tickMs: next.settings.simulationIntervalMs })
-    if (sim.position) logLocation(db, { lat: sim.position.lat, lng: sim.position.lng, status: sim.status, runId: next.activeRunId, event })
+  // Where one truck's SIMULATED GPS is now (null without a usable route).
+  function simulateTruck(data, truckId, nowMs = Date.now()) {
+    const route = routeOfTruck(data, truckId)
+    if (!route || validateRoute(route)) return null
+    const results = currentRun(data, truckId)?.results ?? {}
+    return { route, sim: computeSimulation({ route, control: simulationOf(data, truckId), results, nowMs, tickMs: data.settings.simulationIntervalMs }) }
+  }
+
+  function logTruck(next, truckId, event) {
+    const sim = simulateTruck(next, truckId)?.sim
+    if (sim?.position) logLocation(db, { lat: sim.position.lat, lng: sim.position.lng, status: sim.status, runId: activeRunIdOf(next, truckId), event, truckId })
   }
 
   /** Applies an action for a signed-in user. Returns the user's new data snapshot. */
@@ -157,7 +166,7 @@ export function createService(db) {
     const next = dataReducer(state, action)
     if (next !== state) {
       commit(next, () => runEffects(effects, before, next))
-      if (LOGGED_ACTIONS.has(action.type)) logTruck(state, action.type)
+      if (LOGGED_ACTIONS.has(action.type)) logTruck(state, action.payload?.truckId ?? primaryTruckId(state), action.type)
       if (hadImage || /photo/i.test(JSON.stringify(rawAction.payload ?? {}))) removeUnusedImages(db, state)
       kickEmail()
     }
@@ -199,8 +208,9 @@ export function createService(db) {
   }
 
   // ---------- Automatic notifications (in-app + email) ----------
-  let lastNearKey = ''
-  let lastStopKey = ''
+  // Remembered per truck, so each truck's messages and GPS log are separate.
+  const lastNearKey = new Map()
+  const lastStopKey = new Map()
 
   function addAuto(payload) {
     const next = dataReducer(state, { type: 'notification/add', payload })
@@ -215,11 +225,12 @@ export function createService(db) {
     }
   }
 
-  // Rule for "truck approaching" (explicit and simulation-based): when the
-  // SIMULATED truck starts driving to the FIRST pickup point of a purok, that
-  // purok gets one message per route run. It is never claimed to be real GPS.
+  // Rule for "truck approaching" (explicit and simulation-based): when a
+  // truck's SIMULATED position starts driving to the FIRST pickup point of a
+  // purok, that purok gets one message per route run of that truck (one
+  // purok, one truck). It is never claimed to be real GPS.
   function tick(nowMs = Date.now()) {
-    if (!state?.route) return
+    if (!state) return
     const s = state.settings
 
     // Pickup-day reminder, once per day.
@@ -274,49 +285,53 @@ export function createService(db) {
         })
     }
 
-    // Truck approaching a purok (simulated).
-    const results = currentRun(state)?.results ?? {}
-    const sim = computeSimulation({ route: state.route, control: state.simulation, results, nowMs, tickMs: s.simulationIntervalMs })
-    const stops = state.route.stops
-    const targetIndex = sim.waitingAt ? stops.findIndex((x) => x.id === sim.waitingAt) : sim.status === 'running' || sim.status === 'paused' ? sim.legIndex + 1 : -1
-    const target = targetIndex > 0 ? stops[targetIndex] : null
-    const prev = target ? stops.slice(0, targetIndex).filter(isCollectionStop).at(-1) : null
-    const purok = target && isCollectionStop(target) && prev?.purok !== target.purok ? target.purok : null
-    if (s.autoProximityAlerts && purok && sim.startedAt) {
-      const key = `near-${sim.startedAt}-${purok}`
-      if (key !== lastNearKey) {
-        lastNearKey = key
-        const added = addAuto({
-          key,
-          audience: 'resident',
-          zone: purok,
-          kind: 'proximity',
-          priority: 'high',
-          title: 'The garbage truck is coming',
-          body: `The truck is on its way to ${purok}. Please put your garbage bags out now. (Demo: simulated truck location.)`,
-          link: { label: 'See the truck', to: '/resident/track' },
-        })
-        if (added)
-          emailResidents(
-            (r) => r.purok === purok && r.prefs?.truckNearby,
-            (r) => ({
-              eventKey: `near:${sim.startedAt}:${purok}:${r.id}`,
-              to: r.email,
-              subject: 'CleanTrack: the garbage truck is coming',
-              body: `Hello ${r.name},\n\nThe garbage truck is heading to ${purok}. Please put your garbage bags out now.\n\nNote: this demo uses a SIMULATED truck location, not real GPS.\n\n— ${s.barangayName || 'CleanTrack'}`,
-              relatedType: 'proximity',
-              relatedId: purok,
-            }),
-          )
+    // Each truck approaching a purok (simulated), and its arrivals logged.
+    for (const { id: truckId } of trucksOf(state)) {
+      const found = simulateTruck(state, truckId, nowMs)
+      if (!found) continue
+      const { route, sim } = found
+      const stops = route.stops
+      const targetIndex = sim.waitingAt ? stops.findIndex((x) => x.id === sim.waitingAt) : sim.status === 'running' || sim.status === 'paused' ? sim.legIndex + 1 : -1
+      const target = targetIndex > 0 ? stops[targetIndex] : null
+      const prev = target ? stops.slice(0, targetIndex).filter(isCollectionStop).at(-1) : null
+      const purok = target && isCollectionStop(target) && prev?.purok !== target.purok ? target.purok : null
+      if (s.autoProximityAlerts && purok && sim.startedAt) {
+        const key = `near-${truckId}-${sim.startedAt}-${purok}`
+        if (key !== lastNearKey.get(truckId)) {
+          lastNearKey.set(truckId, key)
+          const added = addAuto({
+            key,
+            audience: 'resident',
+            zone: purok,
+            truckId,
+            kind: 'proximity',
+            priority: 'high',
+            title: 'The garbage truck is coming',
+            body: `Truck ${truckId} is on its way to ${purok}. Please put your garbage bags out now. (Demo: simulated truck location.)`,
+            link: { label: 'See the truck', to: '/resident/track' },
+          })
+          if (added)
+            emailResidents(
+              (r) => r.purok === purok && r.prefs?.truckNearby,
+              (r) => ({
+                eventKey: `near:${truckId}:${sim.startedAt}:${purok}:${r.id}`,
+                to: r.email,
+                subject: 'CleanTrack: the garbage truck is coming',
+                body: `Hello ${r.name},\n\nGarbage truck ${truckId} is heading to ${purok}. Please put your garbage bags out now.\n\nNote: this demo uses a SIMULATED truck location, not real GPS.\n\n— ${s.barangayName || 'CleanTrack'}`,
+                relatedType: 'proximity',
+                relatedId: purok,
+              }),
+            )
+        }
       }
-    }
 
-    // Log the simulated position when the truck reaches a stop (low frequency).
-    if (sim.waitingAt) {
-      const key = `${sim.startedAt}-${sim.waitingAt}`
-      if (key !== lastStopKey) {
-        lastStopKey = key
-        logLocation(db, { lat: sim.position.lat, lng: sim.position.lng, status: 'waiting', runId: state.activeRunId, event: `arrived:${sim.waitingAt}` })
+      // Log the simulated position when the truck reaches a stop (low frequency).
+      if (sim.waitingAt) {
+        const key = `${sim.startedAt}-${sim.waitingAt}`
+        if (key !== lastStopKey.get(truckId)) {
+          lastStopKey.set(truckId, key)
+          logLocation(db, { lat: sim.position.lat, lng: sim.position.lng, status: 'waiting', runId: activeRunIdOf(state, truckId), event: `arrived:${sim.waitingAt}`, truckId })
+        }
       }
     }
     kickEmail()
