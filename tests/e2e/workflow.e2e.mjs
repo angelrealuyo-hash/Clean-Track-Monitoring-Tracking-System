@@ -11,7 +11,11 @@ import { join } from 'node:path'
 import { chromium } from 'playwright'
 
 // The full workflow drives a real route, which only runs on collection days.
-if (!['Monday', 'Wednesday', 'Friday'].includes(new Date().toLocaleDateString('en-US', { weekday: 'long' }))) {
+// CleanTrack uses Philippine time (Asia/Manila), whatever this machine's zone is.
+const manilaWeekday = () => new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Manila' })
+const manilaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // YYYY-MM-DD
+const manilaHour = () => Number(new Date().toLocaleString('en-US', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Manila' }))
+if (!['Monday', 'Wednesday', 'Friday'].includes(manilaWeekday())) {
   console.log('This browser test needs a collection day (Monday, Wednesday or Friday): regular routes are refused on other days.')
   console.log('The unit/API tests (npm test) run on any day.')
   process.exit(1)
@@ -40,8 +44,7 @@ const step = async (name, fn) => {
     check(`${name} (step crashed)`, false, e.message.split('\n')[0])
   }
 }
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const TODAY = DAYS[new Date().getDay()]
+const TODAY = manilaWeekday()
 
 // What the SERVER saved (admin view).
 let ADMIN_TOKEN
@@ -84,6 +87,11 @@ try {
     const resToken = (await (await fetch(`${B}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'resident', identifier: '0917 555 0192', password: 'resident123' }) })).json()).token
     const forbidden = await fetch(`${B}/api/actions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resToken}` }, body: JSON.stringify({ type: 'settings/update', payload: { completionTarget: 50 } }) })
     check('0d Resident token cannot change admin settings (403)', forbidden.status === 403)
+    const lockedBtn = a.getByRole('button', { name: 'Reset Locked' })
+    check('0e Settings: Demo Reset shown as locked (button disabled, reason given)', (await seen(a.getByText('Demo Reset is locked', { exact: true }))) && (await lockedBtn.isDisabled()))
+    const beforeReset = JSON.stringify(await serverState())
+    const resetTry = await fetch(`${B}/api/admin/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_TOKEN}` }, body: '{}' })
+    check('0f Direct reset request refused (403); data unchanged', resetTry.status === 403 && /locked to protect system data/.test((await resetTry.json()).error) && JSON.stringify(await serverState()) === beforeReset)
   })
 
   await step('1. Admin creates schedule and route', async () => {
@@ -235,7 +243,7 @@ try {
     check('7c Pickup-day reminder (server, in-app)', await seen(r.getByText(/Garbage pickup today, /), 10000))
     const fb = r.locator('.res-feedback')
     check('7d Asks "Are you planning to dispose of your garbage today?"', await seen(fb.getByText('Are you planning to dispose of your garbage today?')))
-    if (new Date().getHours() >= 6) {
+    if (manilaHour() >= 6) {
       await r.goto(`${B}/resident/notifications`)
       const note = r.locator('article', { hasText: 'Today’s Pick Up Check!' })
       check("7d2 Today's Pick Up Check message with YES / NO", (await seen(note)) && (await seen(note.getByRole('button', { name: 'YES' }))))
@@ -497,8 +505,9 @@ try {
   })
 
   await step('Suspension and the resident calendar', async () => {
-    // Next collection day after today (Mon/Wed/Fri).
-    const next = new Date()
+    // Next collection day after today's Manila date (Mon/Wed/Fri). `next` is a
+    // calendar date on this machine, used only for day arithmetic.
+    const next = new Date(`${manilaToday()}T00:00`)
     do next.setDate(next.getDate() + 1)
     while (![1, 3, 5].includes(next.getDay()))
     const iso = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
@@ -513,7 +522,7 @@ try {
     check('H1 Admin adds a suspension (saved)', (await seen(a.locator('.exceptions-list').getByText('Test suspension'))) && (await serverState()).scheduleExceptions.some((x) => x.date === iso))
     await r.goto(`${B}/resident/schedule`)
     await r.locator('.res-cal').waitFor()
-    if (next.getMonth() !== new Date().getMonth()) await r.getByRole('button', { name: 'Next month' }).click()
+    if (next.getMonth() !== Number(manilaToday().slice(5, 7)) - 1) await r.getByRole('button', { name: 'Next month' }).click()
     const cell = r.locator('.res-cal__day', { has: r.locator(`text="${next.getDate()}"`) }).first()
     check('H2 Calendar: exclamation icon on the suspended day (not the truck)', (await cell.getAttribute('class')).includes('is-holiday'))
     check('H3 Calendar: X today for "could not dispose" (Maria)', (await r.goto(`${B}/resident/schedule`)) && (await seen(r.locator('.res-cal__day.is-today.is-missed'))))

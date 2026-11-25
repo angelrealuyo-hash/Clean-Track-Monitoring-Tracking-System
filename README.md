@@ -64,7 +64,11 @@ Copy `.env.example` to `.env`. Nothing is required for the demo.
 ## How it works
 
 - **Server** (`server/`): Express API + SQLite. Tables are created by `server/migrations/001_init.sql`.
-  Existing data is never reset automatically (only **Settings → Reset Demo Data**, with confirmation).
+  Demo data is added only to an empty database. **Demo Reset is locked**: the server refuses `POST /api/admin/reset`
+  (Settings shows it as locked), so no button or request can replace the real records. To start over, stop the
+  server and use a new database file (`DB_PATH`), keeping the old one as a backup.
+- **Time zone**: every "today", weekday and clock time (collection days, Start Route, reminders, Pick Up Check) is
+  Philippine time (**Asia/Manila**, UTC+08:00), whatever time zone the server or phone uses (`src/utils/format.js`).
 - **Sign-in**: passwords hashed with scrypt; signed tokens that expire after 7 days; disabled accounts are refused.
 - **Permissions & validation**: `server/policy.js` checks every action on the server (who may do it, valid input,
   conflicts such as changing the driver during a route). Residents only receive their own reports and profile.

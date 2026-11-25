@@ -1,3 +1,5 @@
+import { todayISO } from '../utils/format.js'
+
 // The barangay's garbage trucks. Each truck can have its own route, driver on
 // duty, shift crew and demo GPS (see src/store/fleet.js). This first truck is
 // the demo data; more are added in Truck Management.
@@ -62,7 +64,7 @@ export const truckIdKey = (id) => String(id ?? '').trim().toUpperCase()
 // existing data and database column stay as they are. The forms edit the
 // year and the model separately.
 export const MIN_TRUCK_YEAR = 1980
-export const maxTruckYear = () => new Date().getFullYear() + 1
+export const maxTruckYear = () => Number(todayISO().slice(0, 4)) + 1 // Manila year
 export function splitModel(model) {
   const m = /^(\d{4})\s+(.*)$/.exec(String(model ?? '').trim())
   return m ? { year: m[1], model: m[2] } : { year: '', model: String(model ?? '').trim() }

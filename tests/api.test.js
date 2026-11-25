@@ -155,3 +155,29 @@ test('change password: needs the current password; new one works', async () => {
   assert.ok(await login('resident', 'maria.santos@email.com', 'newpass1'))
   assert.equal(await login('resident', 'maria.santos@email.com', 'resident123'), undefined)
 })
+
+test('Demo Reset is locked on the server: no request can replace the data', async () => {
+  const adm = await login('admin', 'admin@cleantrack.gov', 'SuperAdmin#2025')
+  const res = (await call('/auth/register', { body: { name: 'Rosa Lim', phone: '0918 555 7788', street: 'Lot 7 Demo St', purok: 'Purok 4', password: 'rosa123' } })).json.token
+  const drv = await login('driver', 'driver.ortiz@cleantrack.ph', 'driver123')
+  assert.ok(res && drv)
+  // Something that a reset would wipe out.
+  await act(adm, 'broadcast/add', { zone: 'Purok 1', subject: 'Keep this', message: 'This must survive a reset attempt.', channels: ['App'] })
+  const before = await call('/state', { token: adm })
+  const rowsBefore = api.service.state.version
+
+  const r = await call('/admin/reset', { token: adm, body: {} })
+  assert.equal(r.status, 403, 'even the admin is refused')
+  assert.match(r.json.error, /Demo Reset is locked to protect system data/)
+  assert.equal((await call('/admin/reset', { token: res, body: {} })).status, 403)
+  assert.equal((await call('/admin/reset', { token: drv, body: {} })).status, 403)
+  assert.equal((await call('/admin/reset', { body: {} })).status, 401)
+  // The reducer's whole-data actions cannot be sent through /actions either.
+  for (const type of ['reset', 'sync']) assert.equal((await act(adm, type, { trucks: [] })).status, 403, type)
+
+  const after = await call('/state', { token: adm })
+  assert.equal(api.service.state.version, rowsBefore, 'nothing was saved')
+  assert.deepEqual(after.json.data, before.json.data, 'data unchanged')
+  assert.ok(after.json.data.broadcasts.some((b) => b.subject === 'Keep this'))
+  assert.equal(api.service.resetDemo, undefined, 'the server has no reset function at all')
+})

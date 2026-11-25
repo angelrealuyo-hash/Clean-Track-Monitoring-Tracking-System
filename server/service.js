@@ -10,7 +10,7 @@ import { isCollectionDay, scheduleLabel } from '../src/data/schedule.js'
 import { isResidentPickupDate } from '../src/resident/data/phHolidays.js'
 import { storeActionImage, removeUnusedImages } from './uploads.js'
 import { demoUsers } from '../src/data/users.js'
-import { to24h, todayISO, todayName } from '../src/utils/format.js'
+import { manilaMoment, to24h, todayISO, todayName } from '../src/utils/format.js'
 import { normalizePhone } from '../src/utils/validate.js'
 import { transaction } from './db.js'
 import { hasData, loadState, saveState, findAccount, getAccountByRef, insertAccount, updateAccount, logLocation } from './repository.js'
@@ -233,12 +233,12 @@ export function createService(db) {
     if (!state) return
     const s = state.settings
 
-    // Pickup-day reminder, once per day.
-    const today = todayISO()
+    // Pickup-day reminder, once per day. "Today" is the Manila date of nowMs.
+    const today = todayISO(nowMs)
     // Official collection days only (Mon/Wed/Fri), whatever the saved rows say.
     // Official Philippine holidays and the admin's holidays / suspensions cancel
     // the residents' pickup (no reminder, no Pick Up Check). Never moved.
-    const run = isCollectionDay(todayName()) && isResidentPickupDate(todayISO(), state.scheduleExceptions) ? state.weeklySchedule.find((d) => d.day === todayName()) : null
+    const run = isCollectionDay(todayName(nowMs)) && isResidentPickupDate(today, state.scheduleExceptions) ? state.weeklySchedule.find((d) => d.day === todayName(nowMs)) : null
     if (s.autoScheduleReminders && run) {
       const start = run.window.split(' - ')[0]
       const added = addAuto({
@@ -269,10 +269,9 @@ export function createService(db) {
     // before the pickup window starts. Answers come back through feedback/submit
     // (one record per resident per day), and answering marks it read.
     if (s.autoPickupCheck !== false && run) {
-      const [h, m] = (to24h(run.window.split(' - ')[0]) || '00:00').split(':').map(Number)
-      const askAt = new Date(nowMs)
-      askAt.setHours(h - 1, m, 0, 0)
-      if (nowMs >= askAt.getTime())
+      // One hour before the window starts, in Manila time (not the server's zone).
+      const askAt = manilaMoment(today, to24h(run.window.split(' - ')[0]) || '00:00') - 60 * 60 * 1000
+      if (nowMs >= askAt)
         addAuto({
           key: `pickup-check-${today}`,
           audience: 'resident',
@@ -348,16 +347,6 @@ export function createService(db) {
       })
   }
 
-  // ---------- Demo reset (admin, explicit confirmation in the UI) ----------
-  function resetDemo() {
-    transaction(db, () => {
-      db.exec('DELETE FROM accounts')
-      seedAccounts()
-    })
-    const fresh = createInitialData()
-    commit({ ...fresh, version: state.version })
-  }
-
   return {
     get state() {
       return state
@@ -366,7 +355,6 @@ export function createService(db) {
     register,
     snapshotFor,
     tick,
-    resetDemo,
     subscribe(fn) {
       listeners.add(fn)
       return () => listeners.delete(fn)

@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Bell, Building2, Phone, Database, KeyRound, RotateCcw, Save, SlidersHorizontal, Truck, UserCog } from 'lucide-react'
+import { ArrowLeft, Bell, Building2, Phone, Database, KeyRound, Lock, Save, SlidersHorizontal, Truck, UserCog } from 'lucide-react'
 import ChangePasswordModal from '../../components/ChangePasswordModal.jsx'
 import AvatarPicker from '../../components/AvatarPicker.jsx'
 import { useAuth } from '../../auth/authContext.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Field from '../../components/Field.jsx'
-import ConfirmModal from '../../components/ConfirmModal.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { useData } from '../../store/dataContext.js'
 import { useToast } from '../../components/toast/toastContext.js'
@@ -52,11 +51,10 @@ function Section({ icon: Icon, title, subtitle, tag, children }) {
 
 // PDF pages 32-33
 export default function SettingsPage() {
-  const { data, dispatch, reset } = useData()
+  const { data, dispatch } = useData()
   const toast = useToast()
   const [draft, setDraft] = useState(data.settings)
   const [errors, setErrors] = useState({})
-  const [confirmReset, setConfirmReset] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const [photoSaving, setPhotoSaving] = useState(false)
 
@@ -258,14 +256,17 @@ export default function SettingsPage() {
         </ul>
       </Section>
 
-      <Section icon={Database} title="5. Demo Data" subtitle="Restore the starting demo data on the server (for demonstrations)">
+      <Section icon={Database} title="5. Demo Data" subtitle="Demo Reset is locked to protect system data">
         <div className="settings-toggle">
           <div>
-            <strong>Reset all demo data</strong>
-            <p>Restores the original truck, drivers, route, reports, notifications and settings.</p>
+            <strong>Demo Reset is locked</strong>
+            <p>
+              A reset would replace every record (trucks, routes, drivers, residents, reports and collection history) with demo data, so the
+              server refuses it. Your data is kept.
+            </p>
           </div>
-          <button type="button" className="ct-btn ct-btn--danger" onClick={() => setConfirmReset(true)}>
-            <RotateCcw size={15} /> Reset Demo Data
+          <button type="button" className="ct-btn ct-btn--danger" disabled title="Locked to protect system data">
+            <Lock size={15} /> Reset Locked
           </button>
         </div>
       </Section>
@@ -277,21 +278,6 @@ export default function SettingsPage() {
         <div className="admin-page__actions">{actions}</div>
       </footer>
 
-      {confirmReset && (
-        <ConfirmModal
-          title="Reset Demo Data"
-          confirmLabel="Reset Everything"
-          onClose={() => setConfirmReset(false)}
-          onConfirm={() => {
-            reset()
-            setDraft({ ...defaultSettings })
-            setErrors({})
-            toast('Demo data reset')
-          }}
-        >
-          <p>This replaces ALL data in the CleanTrack database with the starting demo data: truck, drivers, route, schedule, reports, notifications, collection runs, settings and resident accounts. Only use it for demonstrations.</p>
-        </ConfirmModal>
-      )}
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
     </div>
   )

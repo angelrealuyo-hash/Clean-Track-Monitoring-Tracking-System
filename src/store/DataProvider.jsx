@@ -110,17 +110,6 @@ export default function DataProvider({ children }) {
     [key, token, store, user, handleError, toast, load],
   )
 
-  const reset = useCallback(async () => {
-    try {
-      const snap = await api('/admin/reset', { token, body: {} })
-      setStore((s) => ({ ...s, data: snap.data, version: snap.version }))
-      return { ok: true }
-    } catch (err) {
-      toast(err.message, 'error')
-      return { ok: false, error: err.message }
-    }
-  }, [token, toast])
-
   const value = useMemo(
     () => ({
       data,
@@ -129,10 +118,9 @@ export default function DataProvider({ children }) {
       email: store.email,
       token,
       dispatch,
-      reset,
       reload: load,
     }),
-    [data, key, store, token, dispatch, reset, load],
+    [data, key, store, token, dispatch, load],
   )
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

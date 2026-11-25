@@ -8,7 +8,7 @@
 //   GET  /api/events?token=    live "data changed" stream (Server-Sent Events)
 //   GET  /api/admin/email-log  email attempts (admin)
 //   GET  /api/admin/locations  simulated location history (admin; ?truck= for one truck)
-//   POST /api/admin/reset      restore demo data (admin)
+//   POST /api/admin/reset      LOCKED: always refused (Demo Reset would replace real data)
 import express from 'express'
 import { openDatabase } from './db.js'
 import { createService } from './service.js'
@@ -19,6 +19,8 @@ import { HttpError } from './policy.js'
 import { canViewImage, getImage } from './uploads.js'
 import { demoUsers } from '../src/data/users.js'
 import { normalizePhone } from '../src/utils/validate.js'
+
+export const DEMO_RESET_LOCKED = 'Demo Reset is locked to protect system data. No records were changed.'
 
 export function createApi({ db = openDatabase(), tickMs = 15_000 } = {}) {
   const service = createService(db)
@@ -144,9 +146,12 @@ export function createApi({ db = openDatabase(), tickMs = 15_000 } = {}) {
     const truck = typeof req.query.truck === 'string' && /^[A-Za-z0-9-]{1,12}$/.test(req.query.truck) ? req.query.truck : null
     res.json({ entries: recentLocations(db, 25, truck) })
   })
+  // Demo Reset is locked: it would replace every record (trucks, routes,
+  // drivers, residents, reports, collection history) with demo data. There is
+  // no reset code on the server any more, so no request can trigger one.
+  // To start over, use a new database file (see README, "Run it").
   api.post('/admin/reset', requireUser(['admin']), (req, res) => {
-    service.resetDemo()
-    res.json(service.snapshotFor(req.user))
+    res.status(403).json({ error: DEMO_RESET_LOCKED })
   })
 
   // ---------- Errors ----------

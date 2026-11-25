@@ -8,7 +8,7 @@ import StatusBadge from '../../components/StatusBadge.jsx'
 import { summarizeFeedback, summarizeRun, summarizeRunsInRange } from '../../store/selectors.js'
 import { feedbackReasonLabel, feedbackReasons } from '../../data/collectionFeedback.js'
 import { downloadCsv } from '../../utils/csv.js'
-import { daysAgoISO, formatDate, formatDateTime, todayISO } from '../../utils/format.js'
+import { daysAgoISO, formatDate, formatDateTime, formatStamp, todayISO } from '../../utils/format.js'
 import { useToast } from '../../components/toast/toastContext.js'
 
 const presets = [
@@ -80,7 +80,7 @@ export default function FeedbackAnalytics({ feedback, runs, residentCount }) {
         f.reason ? feedbackReasonLabel(f.reason) : '',
         f.reasonText,
         f.reportId ?? '',
-        new Date(f.updatedAt).toLocaleString('en-PH'),
+        formatStamp(f.updatedAt),
       ]),
     )
     toast('Resident feedback exported')

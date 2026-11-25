@@ -28,7 +28,7 @@ import { useToast } from '../../components/toast/toastContext.js'
 import { currentRun, getCollectionSummary, getStopStatus, stopStatusMeta } from '../../store/selectors.js'
 import { isCollectionStop, SIMULATION_LABEL } from '../../services/trackingSimulation.js'
 import { downloadCsv } from '../../utils/csv.js'
-import { formatDateTime, formatTime, localDateISO, todayISO } from '../../utils/format.js'
+import { formatDateTime, formatStamp, formatTime, manilaDateISO, todayISO } from '../../utils/format.js'
 import { exceptionOn, isPickupDate, scheduleLabel } from '../../data/schedule.js'
 import '../components/AdminPage.css'
 import './CollectionMonitoringPage.css'
@@ -93,7 +93,7 @@ export default function CollectionMonitoringPage() {
         stopStatusMeta[s.status].label,
         s.manual ? recordedBy(s.manual) : '',
         s.manual?.note ?? '',
-        s.manual ? new Date(s.manual.at).toLocaleString('en-PH') : '',
+        s.manual ? formatStamp(s.manual.at) : '',
       ]),
     )
     toast('Collection log exported')
@@ -396,7 +396,7 @@ export default function CollectionMonitoringPage() {
 function DriverIssuesCard({ issues }) {
   const shown = issues.slice(0, 15)
   const today = todayISO()
-  const todayCount = issues.filter((x) => localDateISO(x.reportedAt) === today).length
+  const todayCount = issues.filter((x) => manilaDateISO(x.reportedAt) === today).length
   return (
     <article className="ct-card collection-issues">
       <div className="ct-card__header">

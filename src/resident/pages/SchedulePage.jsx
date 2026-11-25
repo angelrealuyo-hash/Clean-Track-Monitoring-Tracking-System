@@ -10,7 +10,7 @@ import { dayOfDate, exceptionLabel, scheduleLabel } from '../../data/schedule.js
 import { calendarLegend, dayStatus } from '../../data/calendarStatus.js'
 import { feedbackReasonLabel } from '../../data/collectionFeedback.js'
 import { holidayTypes, holidaysListedFor } from '../data/phHolidays.js'
-import { formatDate, localDateISO, todayISO } from '../../utils/format.js'
+import { formatDate, localDateISO, manilaDateISO, todayISO } from '../../utils/format.js'
 import './ResidentPages.css'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -43,7 +43,7 @@ export default function SchedulePage() {
     exceptions: data.scheduleExceptions ?? [],
     feedback: data.collectionFeedback ?? [],
     checkDates,
-    since: resident.createdAt ? localDateISO(resident.createdAt) : '',
+    since: resident.createdAt ? manilaDateISO(resident.createdAt) : '',
   }
 
   // Calendar cells: blanks before the 1st, then each day of the month.

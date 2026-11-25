@@ -148,7 +148,7 @@ function recordStop(state, { truckId: truckIdIn, stopId, status, note = '', by =
 
 // Adds a resident report and alerts the office. Returns the new state and report.
 function addReport(state, p) {
-  const year = new Date().getFullYear()
+  const year = todayISO().slice(0, 4) // Manila year
   const { history: firstEntry = 'Report submitted by resident', ...fields } = p
   const report = {
     ...fields,

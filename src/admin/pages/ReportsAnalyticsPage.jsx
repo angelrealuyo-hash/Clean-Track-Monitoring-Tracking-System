@@ -11,7 +11,7 @@ import { useToast } from '../../components/toast/toastContext.js'
 import { getCollectionSummary, summarizeRun } from '../../store/selectors.js'
 import { reportCategories } from '../../data/reports.js'
 import { downloadCsv } from '../../utils/csv.js'
-import { formatDate, formatTime, todayISO } from '../../utils/format.js'
+import { formatDate, formatStamp, formatTime, todayISO } from '../../utils/format.js'
 import '../components/AdminPage.css'
 import './ReportsAnalyticsPage.css'
 
@@ -72,8 +72,8 @@ export default function ReportsAnalyticsPage() {
         h.run.id,
         h.run.date,
         h.run.driverName,
-        new Date(h.run.startedAt).toLocaleString('en-PH'),
-        h.run.endedAt ? new Date(h.run.endedAt).toLocaleString('en-PH') : '',
+        formatStamp(h.run.startedAt),
+        formatStamp(h.run.endedAt),
         h.total,
         h.collected,
         h.missed,
